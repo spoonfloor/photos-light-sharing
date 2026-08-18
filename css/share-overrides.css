@@ -31,3 +31,11 @@ body.share-view.filter-chip-rail-visible {
 .share-error {
   color: #ff6b6b;
 }
+
+.share-layout-placeholder {
+  color: transparent !important;
+}
+
+.share-skeleton-section .month-select-circle {
+  visibility: hidden;
+}

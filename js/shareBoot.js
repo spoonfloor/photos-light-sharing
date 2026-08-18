@@ -117,15 +117,7 @@
     const resolved = title || 'Shared Photos';
     document.title = resolved;
     els.sharePageTitle.textContent = resolved;
-  }
-
-  function renderShareSkeleton(meta) {
-    const photoCount = meta?.album?.photo_count ?? 0;
-    els.shareEmpty.hidden = photoCount > 0;
-    ShareSkeletonGrid.render(els.photoContainer, {
-      monthKey: meta?.first_cluster?.month_key ?? 'undated',
-      cellCount: photoCount,
-    });
+    els.sharePageTitle.classList.remove('share-layout-placeholder');
   }
 
   function mediaUrl(photo, kind) {
@@ -554,14 +546,21 @@
     wireLightbox();
     wireEvents();
 
+    ShareSkeletonGrid.renderInstantBoot(els.sharePageTitle, els.photoContainer);
+
     try {
       const metaPromise = resolveShareMeta();
       const fullPromise = resolveShareFull();
 
       const meta = await metaPromise;
       state.album = meta.album;
-      applyShareTitle(meta.album?.title);
-      renderShareSkeleton(meta);
+      ShareSkeletonGrid.applyMeta(
+        els.sharePageTitle,
+        els.photoContainer,
+        meta,
+        els.shareEmpty,
+      );
+      document.title = els.sharePageTitle.textContent || 'Shared Photos';
 
       const payload = await fullPromise;
       state.album = payload.album;

@@ -84,16 +84,15 @@
     return `${config.supabaseUrl}/functions/v1/share-resolve`;
   }
 
-  async function resolveShare(token) {
-    const response = await fetch(
-      `${shareResolveUrl()}?token=${encodeURIComponent(token)}`,
-      {
-        headers: {
-          apikey: config.supabaseKey,
-          Authorization: `Bearer ${config.supabaseKey}`,
-        },
+  async function fetchShareResolve(searchParams) {
+    const params = new URLSearchParams(searchParams);
+    params.set('token', state.token);
+    const response = await fetch(`${shareResolveUrl()}?${params.toString()}`, {
+      headers: {
+        apikey: config.supabaseKey,
+        Authorization: `Bearer ${config.supabaseKey}`,
       },
-    );
+    });
     if (!response.ok) {
       if (response.status === 404) {
         throw new Error('Share not found.');
@@ -101,6 +100,32 @@
       throw new Error(`Could not load share (${response.status})`);
     }
     return response.json();
+  }
+
+  async function resolveShareMeta() {
+    return fetchShareResolve({
+      phase: 'meta',
+      sort: state.sortOrder,
+    });
+  }
+
+  async function resolveShareFull() {
+    return fetchShareResolve({});
+  }
+
+  function applyShareTitle(title) {
+    const resolved = title || 'Shared Photos';
+    document.title = resolved;
+    els.sharePageTitle.textContent = resolved;
+  }
+
+  function renderShareSkeleton(meta) {
+    const photoCount = meta?.album?.photo_count ?? 0;
+    els.shareEmpty.hidden = photoCount > 0;
+    ShareSkeletonGrid.render(els.photoContainer, {
+      monthKey: meta?.first_cluster?.month_key ?? 'undated',
+      cellCount: photoCount,
+    });
   }
 
   function mediaUrl(photo, kind) {
@@ -214,9 +239,7 @@
     state.lastClickedIndex = null;
     surface.renderGrid({ deferThumbSrc });
     if (deferThumbSrc) {
-      void SurfaceLoadOverlay.flushDomPaint().then(() => {
-        surface.hydrateThumbs();
-      });
+      surface.hydrateThumbs();
     }
   }
 
@@ -531,25 +554,22 @@
     wireLightbox();
     wireEvents();
 
-    SurfaceLoadOverlay.show({
-      title: 'Loading share',
-      message: 'Loading your media.',
-    });
-
     try {
-      const payload = await resolveShare(state.token);
+      const metaPromise = resolveShareMeta();
+      const fullPromise = resolveShareFull();
+
+      const meta = await metaPromise;
+      state.album = meta.album;
+      applyShareTitle(meta.album?.title);
+      renderShareSkeleton(meta);
+
+      const payload = await fullPromise;
       state.album = payload.album;
       state.photos = payload.photos || [];
-
-      const title = state.album.title || 'Shared Photos';
-      document.title = title;
-      els.sharePageTitle.textContent = title;
+      applyShareTitle(state.album?.title);
       surface.renderGrid({ deferThumbSrc: true });
-      await SurfaceLoadOverlay.flushDomPaint();
-      SurfaceLoadOverlay.hide();
       surface.hydrateThumbs();
     } catch (error) {
-      SurfaceLoadOverlay.hide();
       els.shareError.hidden = false;
       els.shareError.textContent = error.message || 'Could not load share.';
     }

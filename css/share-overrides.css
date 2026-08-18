@@ -34,6 +34,11 @@ body.share-view.filter-chip-rail-visible {
 
 .share-layout-placeholder {
   color: transparent !important;
+  background: var(--placeholder-bg);
+}
+
+.share-page-title.share-layout-placeholder {
+  width: fit-content;
 }
 
 .share-skeleton-section .month-select-circle {

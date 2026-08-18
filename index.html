@@ -99,59 +99,99 @@
         <div class="share-error" id="shareError" hidden></div>
       </div>
     </main>
+<!-- Lightbox Overlay -->
 <div class="lightbox-overlay" id="lightboxOverlay" style="display: none">
+  <!-- Top bar with gradient -->
   <div class="lightbox-top-bar">
     <button
       class="lightbox-icon-button"
       id="lightboxBackBtn"
       aria-label="Close"
-      type="button"
     >
       <span class="material-symbols-outlined">arrow_back</span>
     </button>
     <div class="lightbox-spacer"></div>
     <button
       class="lightbox-icon-button"
-      id="lightboxStarBtn"
-      aria-label="Star"
-      type="button"
+      id="lightboxRotateBtn"
+      aria-label="Rotate"
     >
-      <span class="material-symbols-outlined">star</span>
+      <span class="material-symbols-outlined">rotate_left</span>
     </button>
     <button
       class="lightbox-icon-button"
-      id="lightboxInfoBtn"
-      aria-label="Info"
-      type="button"
+      id="lightboxEditDateBtn"
+      aria-label="Edit Date"
     >
+      <span class="material-symbols-outlined">edit_calendar</span>
+    </button>
+    <button class="lightbox-icon-button" id="lightboxStarBtn" aria-label="Star">
+      <span class="material-symbols-outlined">star</span>
+    </button>
+    <button class="lightbox-icon-button" id="lightboxInfoBtn" aria-label="Info">
       <span class="material-symbols-outlined">info</span>
+    </button>
+    <button
+      class="lightbox-icon-button"
+      id="lightboxRestoreBtn"
+      aria-label="Restore"
+      title="Restore"
+      hidden
+    >
+      <span class="material-symbols-outlined">undo</span>
     </button>
     <button
       class="lightbox-icon-button"
       id="lightboxDownloadBtn"
       aria-label="Download"
-      type="button"
+      title="Download"
     >
       <span class="material-symbols-outlined">download</span>
     </button>
+    <button
+      class="lightbox-icon-button"
+      id="lightboxDeleteBtn"
+      aria-label="Delete"
+    >
+      <span class="material-symbols-outlined">delete</span>
+    </button>
   </div>
+
+  <!-- Navigation chevrons -->
   <button
     class="lightbox-nav-btn lightbox-nav-left"
     id="lightboxPrevBtn"
     aria-label="Previous"
-    type="button"
   >
     <span class="material-symbols-outlined">chevron_left</span>
   </button>
-  <div class="lightbox-content" id="lightboxContent"></div>
   <button
     class="lightbox-nav-btn lightbox-nav-right"
     id="lightboxNextBtn"
     aria-label="Next"
-    type="button"
   >
     <span class="material-symbols-outlined">chevron_right</span>
   </button>
+
+  <!-- Photo content -->
+  <div class="lightbox-content" id="lightboxContent">
+    <!-- Image or video will be inserted here -->
+  </div>
+
+  <!-- Info panel at bottom -->
+  <div class="lightbox-info-panel" id="lightboxInfoPanel" style="display: none">
+    <button class="info-close-btn" id="infoCloseBtn" aria-label="Close">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+    <div class="info-row">
+      <span class="info-label">Date:</span>
+      <a href="#" class="info-value info-link" id="infoDate">-</a>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Filename:</span>
+      <a href="#" class="info-value info-link" id="infoFilename">-</a>
+    </div>
+  </div>
 </div>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="js/config.js"></script>
@@ -161,6 +201,7 @@
     <script src="js/photoSurface/gridInteractions.js"></script>
     <script src="js/photoSurface/chrome.js"></script>
     <script src="js/photoSurface/simpleGrid.js"></script>
+    <script src="js/photoSurface/lightboxShell.js"></script>
     <script src="js/shareBoot.js"></script>
   </body>
 </html>

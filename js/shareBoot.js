@@ -3,12 +3,13 @@
  */
 (() => {
   ViewCapabilities.setSurface('share');
+  GridSelection.setPhotoIdNormalizer((id) => String(id));
 
   const config = window.SHARE_VIEWER_CONFIG;
   const caps = ViewCapabilities.SHARE;
 
   const state = {
-    slug: null,
+    token: null,
     album: null,
     photos: [],
     sortOrder: 'newest',
@@ -33,18 +34,11 @@
     utilitiesMenu: document.getElementById('utilitiesMenu'),
     clearStarsBtn: document.getElementById('clearStarsBtn'),
     filterChipScroll: document.querySelector('.filter-chip-rail-scroll'),
-    lightboxOverlay: document.getElementById('lightboxOverlay'),
     lightboxContent: document.getElementById('lightboxContent'),
-    lightboxBackBtn: document.getElementById('lightboxBackBtn'),
-    lightboxStarBtn: document.getElementById('lightboxStarBtn'),
-    lightboxInfoBtn: document.getElementById('lightboxInfoBtn'),
-    lightboxDownloadBtn: document.getElementById('lightboxDownloadBtn'),
-    lightboxPrevBtn: document.getElementById('lightboxPrevBtn'),
-    lightboxNextBtn: document.getElementById('lightboxNextBtn'),
   };
 
   function storageKey(suffix) {
-    return `photos-light-share:${state.slug}:${suffix}`;
+    return `photos-light-share:${state.token}:${suffix}`;
   }
 
   function loadLocalState() {
@@ -78,29 +72,43 @@
     localStorage.setItem(storageKey('sort'), state.sortOrder);
   }
 
-  function parseSlug() {
-    return new URLSearchParams(window.location.search).get('s');
+  function parseShareToken() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('t') || params.get('s');
   }
 
-  async function supabaseFetch(path) {
-    const response = await fetch(`${config.supabaseUrl}${path}`, {
-      headers: {
-        apikey: config.supabaseKey,
-        Authorization: `Bearer ${config.supabaseKey}`,
+  function shareResolveUrl() {
+    if (config.shareResolveUrl) {
+      return config.shareResolveUrl;
+    }
+    return `${config.supabaseUrl}/functions/v1/share-resolve`;
+  }
+
+  async function resolveShare(token) {
+    const response = await fetch(
+      `${shareResolveUrl()}?token=${encodeURIComponent(token)}`,
+      {
+        headers: {
+          apikey: config.supabaseKey,
+          Authorization: `Bearer ${config.supabaseKey}`,
+        },
       },
-    });
+    );
     if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Share not found.');
+      }
       throw new Error(`Could not load share (${response.status})`);
     }
     return response.json();
   }
 
-  function publicUrl(storagePath) {
-    const encoded = storagePath
-      .split('/')
-      .map((part) => encodeURIComponent(part))
-      .join('/');
-    return `${config.supabaseUrl}/storage/v1/object/public/${config.storageBucket}/${encoded}`;
+  function mediaUrl(photo, kind) {
+    const url = kind === 'thumb' ? photo.thumb_url : photo.original_url;
+    if (!url) {
+      throw new Error('Share media URL is missing.');
+    }
+    return url;
   }
 
   function parseDate(value) {
@@ -168,7 +176,7 @@
     parseDate,
     isStarred: (photo) => isStarred(photo),
     isSelected: (photoId) => state.selected.has(String(photoId)),
-    thumbUrl: (photo) => publicUrl(photo.thumb_path),
+    thumbUrl: (photo) => mediaUrl(photo, 'thumb'),
     onAfterRender: () => {
       GridInteractions.wireContainer(els.photoContainer, interactionCtx);
       updateChrome();
@@ -292,6 +300,99 @@
     syncSelectionView();
   }
 
+  function updateLightboxStarButton() {
+    const photo = photoById(state.lightboxPhotoId);
+    const starIcon = document
+      .getElementById('lightboxStarBtn')
+      ?.querySelector('.material-symbols-outlined');
+    if (starIcon) {
+      starIcon.classList.toggle('filled', photo ? isStarred(photo) : false);
+    }
+  }
+
+  function updateLightboxNavArrows() {
+    const photos = filteredPhotos();
+    const index = photos.findIndex(
+      (photo) => String(photo.id) === String(state.lightboxPhotoId),
+    );
+    LightboxShell.setNavArrows(index > 0, index >= 0 && index < photos.length - 1);
+  }
+
+  function formatShareLightboxInfo(photo) {
+    const date = parseDate(photo.date_taken);
+    if (date) {
+      const dateString = date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      const timeString = date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      return {
+        dateText: `${dateString} at ${timeString}`,
+        filenameText: photo.original_filename || 'Unknown',
+      };
+    }
+    return {
+      dateText: 'No date in library',
+      filenameText: photo.original_filename || 'Unknown',
+    };
+  }
+
+  function renderLightboxMedia() {
+    const photo = photoById(state.lightboxPhotoId);
+    if (!photo) {
+      closeLightbox();
+      return;
+    }
+    els.lightboxContent.innerHTML = '';
+    if (photo.file_type === 'video') {
+      const video = document.createElement('video');
+      video.controls = true;
+      video.autoplay = true;
+      video.src = mediaUrl(photo, 'original');
+      els.lightboxContent.appendChild(video);
+    } else {
+      const img = document.createElement('img');
+      img.src = mediaUrl(photo, 'original');
+      img.alt = photo.original_filename || 'Shared photo';
+      els.lightboxContent.appendChild(img);
+    }
+  }
+
+  function closeLightbox() {
+    state.lightboxPhotoId = null;
+    els.lightboxContent.innerHTML = '';
+    LightboxShell.hide();
+  }
+
+  function openLightbox(photoId) {
+    state.lightboxPhotoId = photoId;
+    renderLightboxMedia();
+    LightboxShell.show();
+    LightboxShell.refreshChrome();
+  }
+
+  function stepLightbox(delta) {
+    const photos = filteredPhotos();
+    const index = photos.findIndex(
+      (photo) => String(photo.id) === String(state.lightboxPhotoId),
+    );
+    if (index < 0) {
+      return;
+    }
+    const next = photos[index + delta];
+    if (!next) {
+      return;
+    }
+    state.lightboxPhotoId = next.id;
+    renderLightboxMedia();
+    LightboxShell.refreshChrome();
+  }
+
   function toggleStar(photoId) {
     const photo = photoById(photoId);
     if (!photo) {
@@ -313,7 +414,7 @@
     if (els.clearStarsBtn) {
       els.clearStarsBtn.disabled = starredEffectiveSet().size === 0;
     }
-    if (state.lightboxPhotoId === photoId) {
+    if (state.lightboxPhotoId != null && String(state.lightboxPhotoId) === id) {
       updateLightboxStarButton();
     }
   }
@@ -339,62 +440,6 @@
     updateChrome();
   }
 
-  function openLightbox(photoId) {
-    state.lightboxPhotoId = photoId;
-    els.lightboxOverlay.style.display = 'flex';
-    renderLightbox();
-  }
-
-  function closeLightbox() {
-    state.lightboxPhotoId = null;
-    els.lightboxOverlay.style.display = 'none';
-    els.lightboxContent.innerHTML = '';
-  }
-
-  function renderLightbox() {
-    const photo = photoById(state.lightboxPhotoId);
-    if (!photo) {
-      closeLightbox();
-      return;
-    }
-    els.lightboxContent.innerHTML = '';
-    if (photo.file_type === 'video') {
-      const video = document.createElement('video');
-      video.controls = true;
-      video.autoplay = true;
-      video.src = publicUrl(photo.original_path);
-      els.lightboxContent.appendChild(video);
-    } else {
-      const img = document.createElement('img');
-      img.src = publicUrl(photo.original_path);
-      img.alt = photo.original_filename || 'Shared photo';
-      els.lightboxContent.appendChild(img);
-    }
-    updateLightboxStarButton();
-  }
-
-  function updateLightboxStarButton() {
-    const photo = photoById(state.lightboxPhotoId);
-    const starIcon = els.lightboxStarBtn?.querySelector('.material-symbols-outlined');
-    if (starIcon) {
-      starIcon.classList.toggle('filled', photo ? isStarred(photo) : false);
-    }
-  }
-
-  function stepLightbox(delta) {
-    const photos = filteredPhotos();
-    const index = photos.findIndex((photo) => photo.id === state.lightboxPhotoId);
-    if (index < 0) {
-      return;
-    }
-    const next = photos[index + delta];
-    if (!next) {
-      return;
-    }
-    state.lightboxPhotoId = next.id;
-    renderLightbox();
-  }
-
   async function downloadPhotos(photos) {
     if (!photos.length) {
       return;
@@ -402,16 +447,16 @@
     if (photos.length >= (config.zipThreshold || 6)) {
       const zip = new JSZip();
       for (const photo of photos) {
-        const response = await fetch(publicUrl(photo.original_path));
+        const response = await fetch(mediaUrl(photo, 'original'));
         const blob = await response.blob();
         zip.file(photo.original_filename || `${photo.id}.bin`, blob);
       }
       const archive = await zip.generateAsync({ type: 'blob' });
-      triggerDownload(archive, `${state.album.title || state.slug}.zip`);
+      triggerDownload(archive, `${state.album.title || state.token}.zip`);
       return;
     }
     for (const photo of photos) {
-      const response = await fetch(publicUrl(photo.original_path));
+      const response = await fetch(mediaUrl(photo, 'original'));
       const blob = await response.blob();
       triggerDownload(blob, photo.original_filename || `${photo.id}.bin`);
     }
@@ -431,6 +476,26 @@
       return state.photos.filter((photo) => state.selected.has(String(photo.id)));
     }
     return filteredPhotos();
+  }
+
+  function wireLightbox() {
+    LightboxShell.wire({
+      isOpen: () => state.lightboxPhotoId != null,
+      getPhoto: () => photoById(state.lightboxPhotoId),
+      close: closeLightbox,
+      onBack: closeLightbox,
+      navigate: stepLightbox,
+      onStar: () => toggleStar(state.lightboxPhotoId),
+      onDownload: () => {
+        const photo = photoById(state.lightboxPhotoId);
+        if (photo) {
+          void downloadPhotos([photo]);
+        }
+      },
+      formatInfo: formatShareLightboxInfo,
+      updateNavArrows: updateLightboxNavArrows,
+      updateStarButton: updateLightboxStarButton,
+    });
   }
 
   function wireEvents() {
@@ -454,55 +519,24 @@
       PhotoChrome.hideUtilitiesMenu(els.utilitiesMenu);
       clearStars();
     });
-
-    els.lightboxBackBtn.addEventListener('click', closeLightbox);
-    els.lightboxStarBtn.addEventListener('click', () => toggleStar(state.lightboxPhotoId));
-    els.lightboxDownloadBtn.addEventListener('click', () => {
-      const photo = photoById(state.lightboxPhotoId);
-      if (photo) {
-        void downloadPhotos([photo]);
-      }
-    });
-    els.lightboxInfoBtn.addEventListener('click', () => {
-      const photo = photoById(state.lightboxPhotoId);
-      if (!photo) {
-        return;
-      }
-      const date = parseDate(photo.date_taken);
-      window.alert(
-        [
-          photo.original_filename || 'Photo',
-          date ? date.toLocaleString() : 'Undated',
-          photo.file_type === 'video' ? 'Video' : 'Photo',
-        ].join('\n'),
-      );
-    });
-    els.lightboxPrevBtn.addEventListener('click', () => stepLightbox(-1));
-    els.lightboxNextBtn.addEventListener('click', () => stepLightbox(1));
   }
 
   async function boot() {
-    state.slug = parseSlug();
-    if (!state.slug) {
+    state.token = parseShareToken();
+    if (!state.token) {
       els.shareError.hidden = false;
       els.shareError.textContent = 'Missing share link.';
       return;
     }
 
     loadLocalState();
+    wireLightbox();
     wireEvents();
 
     try {
-      const albums = await supabaseFetch(
-        `/rest/v1/albums?slug=eq.${encodeURIComponent(state.slug)}&select=*`,
-      );
-      if (!albums.length) {
-        throw new Error('Share not found.');
-      }
-      state.album = albums[0];
-      state.photos = await supabaseFetch(
-        `/rest/v1/album_photos?album_id=eq.${encodeURIComponent(state.album.id)}&select=*&order=position.asc`,
-      );
+      const payload = await resolveShare(state.token);
+      state.album = payload.album;
+      state.photos = payload.photos || [];
 
       const title = state.album.title || 'Shared Photos';
       document.title = title;

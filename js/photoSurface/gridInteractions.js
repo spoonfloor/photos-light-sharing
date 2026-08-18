@@ -6,6 +6,9 @@ const GridInteractions = (() => {
   const wired = new WeakMap();
 
   function parsePhotoId(card) {
+    if (typeof GridSelection !== 'undefined') {
+      return GridSelection.parseCardId(card);
+    }
     const raw = card?.dataset?.id;
     if (raw == null || raw === '') {
       return null;

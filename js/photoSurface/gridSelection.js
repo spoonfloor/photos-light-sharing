@@ -2,17 +2,29 @@
  * Shared photo selection model — shift-range, month select-all, DOM sync.
  */
 const GridSelection = (() => {
+  /** @type {(raw: string | number) => string | number} */
+  let photoIdNormalizer = (id) => id;
+
+  function setPhotoIdNormalizer(normalizer) {
+    photoIdNormalizer =
+      typeof normalizer === 'function' ? normalizer : (id) => id;
+  }
+
+  function normalizePhotoId(raw) {
+    if (raw == null || raw === '') {
+      return null;
+    }
+    return photoIdNormalizer(raw);
+  }
+
   function parseCardIndex(card) {
     const index = parseInt(card?.dataset?.index, 10);
     return Number.isFinite(index) ? index : null;
   }
 
   function parseCardId(card) {
-    if (typeof GridInteractions !== 'undefined') {
-      return GridInteractions.parsePhotoId(card);
-    }
     const raw = card?.dataset?.id;
-    return raw == null || raw === '' ? null : raw;
+    return normalizePhotoId(raw);
   }
 
   function getAllCards(root) {
@@ -147,6 +159,8 @@ const GridSelection = (() => {
   }
 
   return {
+    setPhotoIdNormalizer,
+    normalizePhotoId,
     applyToDom,
     updateMonthCircleStates,
     selectRange,

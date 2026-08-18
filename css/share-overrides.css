@@ -6,8 +6,8 @@
 
 body.share-view {
   --page-top-gap: 24px;
-  /* DEBUG: hot pink — revert to color-mix(in srgb, var(--placeholder-bg) 40%, #000) */
-  --share-pre-meta-bg: #ff00ff;
+  /* PL0: 40% --placeholder-bg (#2a2a2a) + 60% black → ~#111111 */
+  --share-pre-meta-bg: color-mix(in srgb, var(--placeholder-bg) 40%, #000);
 }
 
 body.share-view.filter-chip-rail-visible {

@@ -29,7 +29,7 @@
     groupByMonthBtn: document.getElementById('groupByMonthBtn'),
     selectedFilterChip: document.getElementById('selectedFilterChip'),
     lightboxOverlay: document.getElementById('lightboxOverlay'),
-    lightboxStage: document.getElementById('lightboxStage'),
+    lightboxContent: document.getElementById('lightboxContent'),
     lightboxBackBtn: document.getElementById('lightboxBackBtn'),
     lightboxStarBtn: document.getElementById('lightboxStarBtn'),
     lightboxInfoBtn: document.getElementById('lightboxInfoBtn'),
@@ -181,14 +181,19 @@
   }
 
   function buildGridStarBadgeHTML(starred) {
-    return starred
-      ? '<span class="grid-star-badge material-symbols-outlined filled" aria-hidden="true">star</span>'
-      : '';
+    if (!starred) {
+      return '';
+    }
+    return (
+      '<span class="star-badge star-badge--readonly" aria-hidden="true">' +
+      '<span class="material-symbols-outlined filled">star</span></span>'
+    );
   }
 
   function buildGridVideoBadgeHTML(isVideo) {
     return isVideo
-      ? '<span class="grid-video-badge material-symbols-outlined" aria-hidden="true">play_circle</span>'
+      ? '<span class="video-badge" aria-hidden="true">' +
+          '<span class="material-symbols-outlined">play_circle</span></span>'
       : '';
   }
 
@@ -211,7 +216,7 @@
       if (key !== currentKey) {
         currentKey = key;
         const header = document.createElement('div');
-        header.className = state.clusterMode === 'month' ? 'month-header' : 'day-header';
+        header.className = 'month-header';
         header.textContent = clusterLabel(date, state.clusterMode);
         els.photoContainer.appendChild(header);
 
@@ -223,12 +228,16 @@
       const card = document.createElement('div');
       card.className = 'photo-card';
       if (state.selected.has(photo.id)) {
-        card.classList.add('is-selected');
+        card.classList.add('selected');
+      }
+      if (isStarred(photo)) {
+        card.classList.add('is-starred');
       }
       card.dataset.id = photo.id;
 
       const img = document.createElement('img');
       img.loading = 'lazy';
+      img.className = 'photo-thumb';
       img.alt = photo.original_filename || 'Shared photo';
       img.src = publicUrl(photo.thumb_path);
       card.appendChild(img);
@@ -263,7 +272,7 @@
     });
 
     const starredCount = starredEffectiveSet().size;
-    els.clearStarsBtn.classList.toggle('disabled', starredCount === 0);
+    els.clearStarsBtn.disabled = starredCount === 0;
     saveLocalState();
   }
 
@@ -319,7 +328,7 @@
   function closeLightbox() {
     state.lightboxPhotoId = null;
     els.lightboxOverlay.style.display = 'none';
-    els.lightboxStage.innerHTML = '';
+    els.lightboxContent.innerHTML = '';
   }
 
   function renderLightbox() {
@@ -328,25 +337,28 @@
       closeLightbox();
       return;
     }
-    els.lightboxStage.innerHTML = '';
+    els.lightboxContent.innerHTML = '';
     if (photo.file_type === 'video') {
       const video = document.createElement('video');
       video.controls = true;
       video.autoplay = true;
       video.src = publicUrl(photo.original_path);
-      els.lightboxStage.appendChild(video);
+      els.lightboxContent.appendChild(video);
     } else {
       const img = document.createElement('img');
       img.src = publicUrl(photo.original_path);
       img.alt = photo.original_filename || 'Shared photo';
-      els.lightboxStage.appendChild(img);
+      els.lightboxContent.appendChild(img);
     }
     updateLightboxStarButton();
   }
 
   function updateLightboxStarButton() {
     const photo = photoById(state.lightboxPhotoId);
-    els.lightboxStarBtn.classList.toggle('active', photo ? isStarred(photo) : false);
+    const starIcon = els.lightboxStarBtn?.querySelector('.material-symbols-outlined');
+    if (starIcon) {
+      starIcon.classList.toggle('filled', photo ? isStarred(photo) : false);
+    }
   }
 
   function stepLightbox(delta) {

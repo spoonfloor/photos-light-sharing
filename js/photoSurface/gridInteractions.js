@@ -58,6 +58,14 @@ const GridInteractions = (() => {
     }
 
     container.addEventListener('click', (event) => {
+      const monthCircle = event.target.closest('.month-select-circle');
+      if (monthCircle && container.contains(monthCircle)) {
+        event.stopPropagation();
+        event.preventDefault();
+        ctx.onMonthCircleClick?.(monthCircle, event);
+        return;
+      }
+
       const starBadge = event.target.closest('.star-badge');
       if (starBadge && container.contains(starBadge)) {
         if (starBadge.classList.contains('star-badge--readonly')) {

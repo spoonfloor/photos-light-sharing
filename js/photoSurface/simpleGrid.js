@@ -25,6 +25,7 @@ const SimplePhotoGrid = (() => {
     }
 
     container.innerHTML = '';
+    container.dataset.gridInteractionsWired = 'false';
     const caps = ctx.getCapabilities?.() ?? ViewCapabilities.get();
 
     if (!photos.length) {
@@ -34,20 +35,30 @@ const SimplePhotoGrid = (() => {
 
     let currentKey = null;
     let gridEl = null;
+    let sectionEl = null;
 
     photos.forEach((photo, index) => {
       const date = ctx.parseDate?.(photo.date_taken) ?? null;
       const key = monthKey(date);
       if (key !== currentKey) {
         currentKey = key;
-        const header = document.createElement('div');
-        header.className = 'month-header';
-        header.innerHTML = `<span class="month-label">${monthHeaderLabel(date)}</span>`;
-        container.appendChild(header);
+        sectionEl = document.createElement('div');
+        sectionEl.className = 'month-section';
+        sectionEl.dataset.month = key;
+
+        const headerBand = document.createElement('div');
+        headerBand.className = 'month-header-band';
+        headerBand.innerHTML =
+          `<div class="month-header">` +
+          `<span class="month-label">${monthHeaderLabel(date)}</span>` +
+          `<div class="month-select-circle"></div>` +
+          `</div>`;
+        sectionEl.appendChild(headerBand);
 
         gridEl = document.createElement('div');
         gridEl.className = 'photo-grid';
-        container.appendChild(gridEl);
+        sectionEl.appendChild(gridEl);
+        container.appendChild(sectionEl);
       }
 
       const card = GridTile.createCard({
@@ -65,6 +76,10 @@ const SimplePhotoGrid = (() => {
       GridTile.attachThumbLoadHandler(img);
       gridEl.appendChild(card);
     });
+
+    if (typeof GridSelection !== 'undefined' && ctx.getSelectedIds) {
+      GridSelection.applyToDom(container, ctx.getSelectedIds());
+    }
 
     ctx.onAfterRender?.(photos);
   }

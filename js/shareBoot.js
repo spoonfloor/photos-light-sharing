@@ -17,6 +17,7 @@
     starred: new Set(),
     unstarredPublished: new Set(),
     lightboxPhotoId: null,
+    lastClickedIndex: null,
   };
 
   const els = {
@@ -155,26 +156,94 @@
 
   const gridCtx = {
     getCapabilities: () => caps,
+    getSelectedIds: () => state.selected,
     parseDate,
     isStarred: (photo) => isStarred(photo),
     isSelected: (photoId) => state.selected.has(photoId),
     thumbUrl: (photo) => publicUrl(photo.thumb_path),
-    onAfterRender: () => updateChrome(),
+    onAfterRender: () => {
+      GridInteractions.wireContainer(els.photoContainer, interactionCtx);
+      updateChrome();
+    },
   };
 
   const interactionCtx = {
     getCapabilities: () => caps,
     getSelectedCount: () => state.selected.size,
     isSelected: (photoId) => state.selected.has(photoId),
-    onToggleSelection: (photoId) => toggleSelection(photoId),
+    onToggleSelection: (_photoId, { event, card }) => {
+      state.lastClickedIndex = GridSelection.toggleCard(
+        els.photoContainer,
+        state.selected,
+        card,
+        event,
+        state.lastClickedIndex,
+      );
+      syncSelectionView();
+    },
+    onMonthCircleClick: (circle, event) => {
+      state.lastClickedIndex = GridSelection.handleMonthCircleClick(
+        els.photoContainer,
+        state.selected,
+        circle,
+        event,
+        state.lastClickedIndex,
+      );
+      syncSelectionView();
+    },
     onToggleStar: (photoId) => toggleStar(photoId),
     onOpenLightbox: (photoId) => openLightbox(photoId),
   };
 
-  function refreshPhotoGrid() {
+  function rebuildPhotoGrid() {
+    state.lastClickedIndex = null;
     const photos = filteredPhotos();
     els.shareEmpty.hidden = photos.length > 0;
     SimplePhotoGrid.render(els.photoContainer, photos, gridCtx);
+  }
+
+  function syncSelectionView() {
+    if (state.selected.size === 0 && state.filters.selected) {
+      state.filters.selected = false;
+      rebuildPhotoGrid();
+      return;
+    }
+
+    if (state.filters.selected) {
+      els.photoContainer.querySelectorAll('.photo-card').forEach((card) => {
+        const id = GridSelection.parseCardId(card);
+        if (id != null && !state.selected.has(id)) {
+          card.remove();
+        }
+      });
+      els.shareEmpty.hidden = filteredPhotos().length > 0;
+      GridSelection.updateMonthCircleStates(els.photoContainer, state.selected);
+    }
+
+    updateChrome();
+  }
+
+  function patchStarOnGrid(photoId) {
+    const photo = photoById(photoId);
+    if (!photo) {
+      return;
+    }
+    const card = els.photoContainer.querySelector(`.photo-card[data-id="${photoId}"]`);
+    if (!card) {
+      return;
+    }
+
+    const starred = isStarred(photo);
+    if (state.filters.starred && !starred) {
+      card.remove();
+      els.shareEmpty.hidden = filteredPhotos().length > 0;
+      GridSelection.updateMonthCircleStates(els.photoContainer, state.selected);
+      updateChrome();
+      return;
+    }
+
+    GridTile.applyStarBadgeState(card, starred, caps);
+    card.classList.toggle('is-starred', starred);
   }
 
   function updateChrome() {
@@ -190,8 +259,12 @@
       selectedCount,
       showSelectedChip: caps.selectedFilterChip,
       onToggle: (filterKey) => {
+        if (filterKey === 'selected' && state.selected.size === 0) {
+          return;
+        }
         state.filters[filterKey] = !state.filters[filterKey];
-        refreshPhotoGrid();
+        state.lastClickedIndex = null;
+        rebuildPhotoGrid();
       },
     });
 
@@ -202,18 +275,10 @@
     saveLocalState();
   }
 
-  function toggleSelection(photoId) {
-    if (state.selected.has(photoId)) {
-      state.selected.delete(photoId);
-    } else {
-      state.selected.add(photoId);
-    }
-    refreshPhotoGrid();
-  }
-
   function clearSelection() {
-    state.selected.clear();
-    refreshPhotoGrid();
+    state.lastClickedIndex = null;
+    GridSelection.clearSelection(els.photoContainer, state.selected);
+    syncSelectionView();
   }
 
   function toggleStar(photoId) {
@@ -231,7 +296,11 @@
       state.starred.add(photoId);
       state.unstarredPublished.delete(photoId);
     }
-    refreshPhotoGrid();
+    patchStarOnGrid(photoId);
+    saveLocalState();
+    if (els.clearStarsBtn) {
+      els.clearStarsBtn.disabled = starredEffectiveSet().size === 0;
+    }
     if (state.lightboxPhotoId === photoId) {
       updateLightboxStarButton();
     }
@@ -242,7 +311,20 @@
     state.unstarredPublished = new Set(
       state.photos.filter((photo) => photo.rating === 5).map((photo) => photo.id),
     );
-    refreshPhotoGrid();
+    if (state.filters.starred) {
+      rebuildPhotoGrid();
+      return;
+    }
+    els.photoContainer.querySelectorAll('.photo-card').forEach((card) => {
+      const id = GridSelection.parseCardId(card);
+      const photo = id != null ? photoById(id) : null;
+      if (!photo) {
+        return;
+      }
+      GridTile.applyStarBadgeState(card, isStarred(photo), caps);
+      card.classList.toggle('is-starred', isStarred(photo));
+    });
+    updateChrome();
   }
 
   function openLightbox(photoId) {
@@ -344,7 +426,7 @@
 
     els.sortToggleBtn.addEventListener('click', () => {
       state.sortOrder = state.sortOrder === 'newest' ? 'oldest' : 'newest';
-      refreshPhotoGrid();
+      rebuildPhotoGrid();
     });
 
     els.downloadBtn.addEventListener('click', () => {
@@ -415,7 +497,7 @@
       const title = state.album.title || 'Shared Photos';
       document.title = title;
       els.sharePageTitle.textContent = title;
-      refreshPhotoGrid();
+      rebuildPhotoGrid();
     } catch (error) {
       els.shareError.hidden = false;
       els.shareError.textContent = error.message || 'Could not load share.';

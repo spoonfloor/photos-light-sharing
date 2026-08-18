@@ -346,18 +346,13 @@
       return;
     }
     els.lightboxContent.innerHTML = '';
-    if (photo.file_type === 'video') {
-      const video = document.createElement('video');
-      video.controls = true;
-      video.autoplay = true;
-      video.src = mediaUrl(photo, 'original');
-      els.lightboxContent.appendChild(video);
-    } else {
-      const img = document.createElement('img');
-      img.src = mediaUrl(photo, 'original');
-      img.alt = photo.original_filename || 'Shared photo';
-      els.lightboxContent.appendChild(img);
-    }
+    els.lightboxContent.style.backgroundColor = 'transparent';
+    LightboxMedia.loadIntoContent(els.lightboxContent, photo, {
+      isVideo: LightboxMedia.isVideoPhoto(photo),
+      getMediaUrl: () => mediaUrl(photo, 'original'),
+      getAltText: (p) => p.original_filename || 'Shared photo',
+      nativeVideoControls: true,
+    });
   }
 
   function closeLightbox() {

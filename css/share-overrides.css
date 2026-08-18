@@ -6,8 +6,8 @@
 
 body.share-view {
   --page-top-gap: 24px;
-  /* DEBUG: hot pink — revert to production PL0 gray when done */
-  --share-pre-meta-bg: #ff00ff;
+  /* PL0: slightly darker than --placeholder-bg (#2a2a2a) */
+  --share-pre-meta-bg: #242424;
 }
 
 body.share-view.filter-chip-rail-visible {

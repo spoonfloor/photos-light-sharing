@@ -1,22 +1,13 @@
 /**
- * Non-virtual month-grouped grid renderer (share viewer).
+ * Non-virtual month-grouped grid renderer (share viewer + library fallback).
  */
 const SimplePhotoGrid = (() => {
   function monthKey(date) {
-    if (!date) {
-      return 'undated';
-    }
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    return MonthGrid.monthKeyFromDate(date);
   }
 
   function monthHeaderLabel(date) {
-    if (!date) {
-      return 'Undated';
-    }
-    if (typeof GridLayout !== 'undefined' && GridLayout.monthLabel) {
-      return GridLayout.monthLabel(monthKey(date));
-    }
-    return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    return MonthGrid.monthLabel(monthKey(date));
   }
 
   function render(container, photos, ctx) {
@@ -37,30 +28,15 @@ const SimplePhotoGrid = (() => {
 
     let currentKey = null;
     let gridEl = null;
-    let sectionEl = null;
 
     photos.forEach((photo, index) => {
       const date = ctx.parseDate?.(photo.date_taken) ?? null;
       const key = monthKey(date);
       if (key !== currentKey) {
         currentKey = key;
-        sectionEl = document.createElement('div');
-        sectionEl.className = 'month-section';
-        sectionEl.dataset.month = key;
-
-        const headerBand = document.createElement('div');
-        headerBand.className = 'month-header-band';
-        headerBand.innerHTML =
-          `<div class="month-header">` +
-          `<span class="month-label">${monthHeaderLabel(date)}</span>` +
-          `<div class="month-select-circle"></div>` +
-          `</div>`;
-        sectionEl.appendChild(headerBand);
-
-        gridEl = document.createElement('div');
-        gridEl.className = 'photo-grid';
-        sectionEl.appendChild(gridEl);
-        container.appendChild(sectionEl);
+        const section = MonthGrid.createMonthSection(key);
+        gridEl = section.gridEl;
+        container.appendChild(section.sectionEl);
       }
 
       const card = GridTile.createCard({
@@ -74,8 +50,7 @@ const SimplePhotoGrid = (() => {
         index,
       });
 
-      const img = card.querySelector('.photo-thumb');
-      GridTile.attachThumbLoadHandler(img);
+      GridTile.attachThumbLoadHandler(card.querySelector('.photo-thumb'));
       gridEl.appendChild(card);
     });
 

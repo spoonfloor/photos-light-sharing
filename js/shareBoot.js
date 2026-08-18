@@ -170,52 +170,49 @@
     return photos;
   }
 
-  const interactionCtx = {
-    getCapabilities: () => caps,
-    getSelectedCount: () => state.selected.size,
-    isSelected: (photoId) => state.selected.has(String(photoId)),
-    onToggleSelection: (_photoId, { event, card }) => {
-      state.lastClickedIndex = GridSelection.toggleCard(
-        els.photoContainer,
-        state.selected,
-        card,
-        event,
-        state.lastClickedIndex,
-      );
-      syncSelectionView();
+  const surface = PhotoSurface.init({
+    caps,
+    container: els.photoContainer,
+    emptyEl: els.shareEmpty,
+    getPhotos: filteredPhotos,
+    adapters: {
+      getSelectedIds: () => state.selected,
+      getSelectedCount: () => state.selected.size,
+      isSelected: (photoId) => state.selected.has(String(photoId)),
+      parseDate,
+      isStarred: (photo) => isStarred(photo),
+      thumbUrl: (photo) => mediaUrl(photo, 'thumb'),
     },
-    onMonthCircleClick: (circle, event) => {
-      state.lastClickedIndex = GridSelection.handleMonthCircleClick(
-        els.photoContainer,
-        state.selected,
-        circle,
-        event,
-        state.lastClickedIndex,
-      );
-      syncSelectionView();
+    interactionHandlers: {
+      onToggleSelection: (_photoId, { event, card }) => {
+        state.lastClickedIndex = GridSelection.toggleCard(
+          els.photoContainer,
+          state.selected,
+          card,
+          event,
+          state.lastClickedIndex,
+        );
+        syncSelectionView();
+      },
+      onMonthCircleClick: (circle, event) => {
+        state.lastClickedIndex = GridSelection.handleMonthCircleClick(
+          els.photoContainer,
+          state.selected,
+          circle,
+          event,
+          state.lastClickedIndex,
+        );
+        syncSelectionView();
+      },
+      onToggleStar: (photoId) => toggleStar(photoId),
+      onOpenLightbox: (photoId) => openLightbox(photoId),
     },
-    onToggleStar: (photoId) => toggleStar(photoId),
-    onOpenLightbox: (photoId) => openLightbox(photoId),
-  };
-
-  const gridCtx = {
-    getCapabilities: () => caps,
-    getSelectedIds: () => state.selected,
-    parseDate,
-    isStarred: (photo) => isStarred(photo),
-    isSelected: (photoId) => state.selected.has(String(photoId)),
-    thumbUrl: (photo) => mediaUrl(photo, 'thumb'),
-    interactionCtx,
-    onAfterRender: () => {
-      updateChrome();
-    },
-  };
+    onAfterRender: updateChrome,
+  });
 
   function rebuildPhotoGrid() {
     state.lastClickedIndex = null;
-    const photos = filteredPhotos();
-    els.shareEmpty.hidden = photos.length > 0;
-    PhotoGrid.render(els.photoContainer, photos, gridCtx);
+    surface.renderGrid();
   }
 
   function syncSelectionView() {
@@ -530,7 +527,7 @@
     }
 
     loadLocalState();
-    PhotoChrome.applySurfaceChrome(caps);
+    PhotoSurface.mountChrome(caps);
     wireLightbox();
     wireEvents();
 

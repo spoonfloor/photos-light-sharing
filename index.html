@@ -14,7 +14,9 @@
       <div id="appBarMount">
 <div class="app-bar-wrapper no-select">
   <div class="app-bar-elements-layer">
-    <div class="title-and-back"></div>
+    <div class="title-and-back">
+      <span class="title title-photos" id="appBarTitle">Photos Light</span>
+    </div>
     <div class="date-picker" hidden aria-hidden="true"></div>
     <div class="actions">
       <button
@@ -77,15 +79,6 @@
     >
       video
     </button>
-    <button
-      type="button"
-      class="filter-chip"
-      data-filter="selected"
-      aria-pressed="false"
-      id="selectedFilterChip"
-    >
-      selected (0)
-    </button>
   </div>
 </div>
     </div>
@@ -96,15 +89,6 @@
       <span class="material-symbols-outlined filled">star</span>
     </span>
     <span>Clear stars</span>
-  </button>
-  <div class="utilities-menu-divider"></div>
-  <button class="utilities-menu-item" id="groupByDayBtn" type="button">
-    <span class="material-symbols-outlined">calendar_view_day</span>
-    <span>Group by day</span>
-  </button>
-  <button class="utilities-menu-item" id="groupByMonthBtn" type="button">
-    <span class="material-symbols-outlined">calendar_view_month</span>
-    <span>Group by month</span>
   </button>
 </div>
     <main class="page-main">
@@ -171,6 +155,11 @@
 </div>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="js/config.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/viewCapabilities.js"></script>
+    <script src="js/photoSurface/gridTile.js"></script>
+    <script src="js/photoSurface/gridInteractions.js"></script>
+    <script src="js/photoSurface/chrome.js"></script>
+    <script src="js/photoSurface/simpleGrid.js"></script>
+    <script src="js/shareBoot.js"></script>
   </body>
 </html>

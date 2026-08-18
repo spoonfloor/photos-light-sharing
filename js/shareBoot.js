@@ -1,11 +1,17 @@
+/**
+ * Share viewer boot — Supabase data adapter wired into shared PhotoSurface modules.
+ */
 (() => {
+  ViewCapabilities.setSurface('share');
+
   const config = window.SHARE_VIEWER_CONFIG;
+  const caps = ViewCapabilities.SHARE;
+
   const state = {
     slug: null,
     album: null,
     photos: [],
     sortOrder: 'newest',
-    clusterMode: 'day',
     filters: { starred: false, video: false, selected: false },
     selected: new Set(),
     starred: new Set(),
@@ -25,9 +31,7 @@
     utilitiesBtn: document.getElementById('utilitiesBtn'),
     utilitiesMenu: document.getElementById('utilitiesMenu'),
     clearStarsBtn: document.getElementById('clearStarsBtn'),
-    groupByDayBtn: document.getElementById('groupByDayBtn'),
-    groupByMonthBtn: document.getElementById('groupByMonthBtn'),
-    selectedFilterChip: document.getElementById('selectedFilterChip'),
+    filterChipScroll: document.querySelector('.filter-chip-rail-scroll'),
     lightboxOverlay: document.getElementById('lightboxOverlay'),
     lightboxContent: document.getElementById('lightboxContent'),
     lightboxBackBtn: document.getElementById('lightboxBackBtn'),
@@ -50,7 +54,6 @@
         JSON.parse(localStorage.getItem(storageKey('unstarredPublished')) || '[]'),
       );
       state.sortOrder = localStorage.getItem(storageKey('sort')) || 'newest';
-      state.clusterMode = localStorage.getItem(storageKey('cluster')) || 'day';
     } catch {
       state.starred = new Set();
       state.selected = new Set();
@@ -66,7 +69,6 @@
       JSON.stringify([...state.unstarredPublished]),
     );
     localStorage.setItem(storageKey('sort'), state.sortOrder);
-    localStorage.setItem(storageKey('cluster'), state.clusterMode);
   }
 
   function parseSlug() {
@@ -151,128 +153,52 @@
     return photos;
   }
 
-  function visibleLightboxPhotos() {
-    return filteredPhotos();
-  }
+  const gridCtx = {
+    getCapabilities: () => caps,
+    parseDate,
+    isStarred: (photo) => isStarred(photo),
+    isSelected: (photoId) => state.selected.has(photoId),
+    thumbUrl: (photo) => publicUrl(photo.thumb_path),
+    onAfterRender: () => updateChrome(),
+  };
 
-  function clusterLabel(date, mode) {
-    if (!date) {
-      return 'Undated';
-    }
-    if (mode === 'month') {
-      return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-    }
-    return date.toLocaleDateString(undefined, {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  }
+  const interactionCtx = {
+    getCapabilities: () => caps,
+    getSelectedCount: () => state.selected.size,
+    isSelected: (photoId) => state.selected.has(photoId),
+    onToggleSelection: (photoId) => toggleSelection(photoId),
+    onToggleStar: (photoId) => toggleStar(photoId),
+    onOpenLightbox: (photoId) => openLightbox(photoId),
+  };
 
-  function clusterKey(date, mode) {
-    if (!date) {
-      return 'undated';
-    }
-    if (mode === 'month') {
-      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    }
-    return date.toISOString().slice(0, 10);
-  }
-
-  function buildGridStarBadgeHTML(starred) {
-    if (!starred) {
-      return '';
-    }
-    return (
-      '<span class="star-badge star-badge--readonly" aria-hidden="true">' +
-      '<span class="material-symbols-outlined filled">star</span></span>'
-    );
-  }
-
-  function buildGridVideoBadgeHTML(isVideo) {
-    return isVideo
-      ? '<span class="video-badge" aria-hidden="true">' +
-          '<span class="material-symbols-outlined">play_circle</span></span>'
-      : '';
-  }
-
-  function renderGrid() {
+  function refreshPhotoGrid() {
     const photos = filteredPhotos();
-    els.photoContainer.innerHTML = '';
     els.shareEmpty.hidden = photos.length > 0;
-
-    if (!photos.length) {
-      updateChrome();
-      return;
-    }
-
-    let currentKey = null;
-    let gridEl = null;
-
-    for (const photo of photos) {
-      const date = parseDate(photo.date_taken);
-      const key = clusterKey(date, state.clusterMode);
-      if (key !== currentKey) {
-        currentKey = key;
-        const header = document.createElement('div');
-        header.className = 'month-header';
-        header.textContent = clusterLabel(date, state.clusterMode);
-        els.photoContainer.appendChild(header);
-
-        gridEl = document.createElement('div');
-        gridEl.className = 'photo-grid';
-        els.photoContainer.appendChild(gridEl);
-      }
-
-      const card = document.createElement('div');
-      card.className = 'photo-card';
-      if (state.selected.has(photo.id)) {
-        card.classList.add('selected');
-      }
-      if (isStarred(photo)) {
-        card.classList.add('is-starred');
-      }
-      card.dataset.id = photo.id;
-
-      const img = document.createElement('img');
-      img.loading = 'lazy';
-      img.className = 'photo-thumb';
-      img.alt = photo.original_filename || 'Shared photo';
-      img.src = publicUrl(photo.thumb_path);
-      card.appendChild(img);
-      card.insertAdjacentHTML('beforeend', buildGridStarBadgeHTML(isStarred(photo)));
-      card.insertAdjacentHTML('beforeend', buildGridVideoBadgeHTML(photo.file_type === 'video'));
-
-      card.addEventListener('click', (event) => {
-        if (event.shiftKey || event.metaKey || event.ctrlKey || state.selected.size > 0) {
-          toggleSelection(photo.id);
-          return;
-        }
-        openLightbox(photo.id);
-      });
-
-      gridEl.appendChild(card);
-    }
-
-    updateChrome();
+    SimplePhotoGrid.render(els.photoContainer, photos, gridCtx);
   }
 
   function updateChrome() {
     const selectedCount = state.selected.size;
     els.deselectAllBtn.classList.toggle('inactive', selectedCount === 0);
-    els.selectedFilterChip.textContent = `selected (${selectedCount})`;
     els.sortIcon.textContent =
       state.sortOrder === 'newest' ? 'hourglass_arrow_down' : 'hourglass_arrow_up';
     els.sortToggleBtn.title = state.sortOrder === 'newest' ? 'Newest first' : 'Oldest first';
 
-    document.querySelectorAll('.filter-chip').forEach((chip) => {
-      const key = chip.dataset.filter;
-      chip.setAttribute('aria-pressed', state.filters[key] ? 'true' : 'false');
+    PhotoChrome.updateFilterChips({
+      scroll: els.filterChipScroll,
+      activeFilters: state.filters,
+      selectedCount,
+      showSelectedChip: caps.selectedFilterChip,
+      onToggle: (filterKey) => {
+        state.filters[filterKey] = !state.filters[filterKey];
+        refreshPhotoGrid();
+      },
     });
 
     const starredCount = starredEffectiveSet().size;
-    els.clearStarsBtn.disabled = starredCount === 0;
+    if (els.clearStarsBtn) {
+      els.clearStarsBtn.disabled = starredCount === 0;
+    }
     saveLocalState();
   }
 
@@ -282,12 +208,12 @@
     } else {
       state.selected.add(photoId);
     }
-    renderGrid();
+    refreshPhotoGrid();
   }
 
   function clearSelection() {
     state.selected.clear();
-    renderGrid();
+    refreshPhotoGrid();
   }
 
   function toggleStar(photoId) {
@@ -305,7 +231,7 @@
       state.starred.add(photoId);
       state.unstarredPublished.delete(photoId);
     }
-    renderGrid();
+    refreshPhotoGrid();
     if (state.lightboxPhotoId === photoId) {
       updateLightboxStarButton();
     }
@@ -316,7 +242,7 @@
     state.unstarredPublished = new Set(
       state.photos.filter((photo) => photo.rating === 5).map((photo) => photo.id),
     );
-    renderGrid();
+    refreshPhotoGrid();
   }
 
   function openLightbox(photoId) {
@@ -362,7 +288,7 @@
   }
 
   function stepLightbox(delta) {
-    const photos = visibleLightboxPhotos();
+    const photos = filteredPhotos();
     const index = photos.findIndex((photo) => photo.id === state.lightboxPhotoId);
     if (index < 0) {
       return;
@@ -413,14 +339,12 @@
     return filteredPhotos();
   }
 
-  function hideUtilitiesMenu() {
-    els.utilitiesMenu.style.display = 'none';
-  }
-
   function wireEvents() {
+    GridInteractions.wireContainer(els.photoContainer, interactionCtx);
+
     els.sortToggleBtn.addEventListener('click', () => {
       state.sortOrder = state.sortOrder === 'newest' ? 'oldest' : 'newest';
-      renderGrid();
+      refreshPhotoGrid();
     });
 
     els.downloadBtn.addEventListener('click', () => {
@@ -430,42 +354,13 @@
     els.deselectAllBtn.addEventListener('click', clearSelection);
 
     els.utilitiesBtn.addEventListener('click', () => {
-      const open = els.utilitiesMenu.style.display === 'block';
-      els.utilitiesMenu.style.display = open ? 'none' : 'block';
+      PhotoChrome.toggleUtilitiesMenu(els.utilitiesBtn, els.utilitiesMenu);
     });
-
-    document.addEventListener('click', (event) => {
-      if (
-        !els.utilitiesMenu.contains(event.target) &&
-        !els.utilitiesBtn.contains(event.target)
-      ) {
-        hideUtilitiesMenu();
-      }
-    });
+    PhotoChrome.wireUtilitiesDismiss(els.utilitiesMenu, els.utilitiesBtn);
 
     els.clearStarsBtn.addEventListener('click', () => {
-      hideUtilitiesMenu();
+      PhotoChrome.hideUtilitiesMenu(els.utilitiesMenu);
       clearStars();
-    });
-
-    els.groupByDayBtn.addEventListener('click', () => {
-      hideUtilitiesMenu();
-      state.clusterMode = 'day';
-      renderGrid();
-    });
-
-    els.groupByMonthBtn.addEventListener('click', () => {
-      hideUtilitiesMenu();
-      state.clusterMode = 'month';
-      renderGrid();
-    });
-
-    document.querySelectorAll('.filter-chip').forEach((chip) => {
-      chip.addEventListener('click', () => {
-        const key = chip.dataset.filter;
-        state.filters[key] = !state.filters[key];
-        renderGrid();
-      });
     });
 
     els.lightboxBackBtn.addEventListener('click', closeLightbox);
@@ -503,6 +398,7 @@
     }
 
     loadLocalState();
+    wireEvents();
 
     try {
       const albums = await supabaseFetch(
@@ -519,8 +415,7 @@
       const title = state.album.title || 'Shared Photos';
       document.title = title;
       els.sharePageTitle.textContent = title;
-      renderGrid();
-      wireEvents();
+      refreshPhotoGrid();
     } catch (error) {
       els.shareError.hidden = false;
       els.shareError.textContent = error.message || 'Could not load share.';

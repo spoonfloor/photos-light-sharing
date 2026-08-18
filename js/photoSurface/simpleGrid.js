@@ -25,7 +25,6 @@ const SimplePhotoGrid = (() => {
     }
 
     container.innerHTML = '';
-    container.dataset.gridInteractionsWired = 'false';
     const caps = ctx.getCapabilities?.() ?? ViewCapabilities.get();
 
     if (!photos.length) {

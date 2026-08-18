@@ -49,10 +49,16 @@
 
   function loadLocalState() {
     try {
-      state.starred = new Set(JSON.parse(localStorage.getItem(storageKey('starred')) || '[]'));
-      state.selected = new Set(JSON.parse(localStorage.getItem(storageKey('selected')) || '[]'));
+      state.starred = new Set(
+        JSON.parse(localStorage.getItem(storageKey('starred')) || '[]').map(String),
+      );
+      state.selected = new Set(
+        JSON.parse(localStorage.getItem(storageKey('selected')) || '[]').map(String),
+      );
       state.unstarredPublished = new Set(
-        JSON.parse(localStorage.getItem(storageKey('unstarredPublished')) || '[]'),
+        JSON.parse(localStorage.getItem(storageKey('unstarredPublished')) || '[]').map(
+          String,
+        ),
       );
       state.sortOrder = localStorage.getItem(storageKey('sort')) || 'newest';
     } catch {
@@ -106,14 +112,16 @@
   }
 
   function photoById(id) {
-    return state.photos.find((photo) => photo.id === id);
+    const key = String(id);
+    return state.photos.find((photo) => String(photo.id) === key);
   }
 
   function isStarred(photo) {
-    if (state.unstarredPublished.has(photo.id)) {
-      return state.starred.has(photo.id);
+    const id = String(photo.id);
+    if (state.unstarredPublished.has(id)) {
+      return state.starred.has(id);
     }
-    if (state.starred.has(photo.id)) {
+    if (state.starred.has(id)) {
       return true;
     }
     return photo.rating === 5;
@@ -123,7 +131,7 @@
     const ids = new Set();
     for (const photo of state.photos) {
       if (isStarred(photo)) {
-        ids.add(photo.id);
+        ids.add(String(photo.id));
       }
     }
     return ids;
@@ -148,7 +156,7 @@
       photos = photos.filter((photo) => photo.file_type === 'video');
     }
     if (state.filters.selected) {
-      photos = photos.filter((photo) => state.selected.has(photo.id));
+      photos = photos.filter((photo) => state.selected.has(String(photo.id)));
     }
     photos.sort(comparePhotos);
     return photos;
@@ -159,7 +167,7 @@
     getSelectedIds: () => state.selected,
     parseDate,
     isStarred: (photo) => isStarred(photo),
-    isSelected: (photoId) => state.selected.has(photoId),
+    isSelected: (photoId) => state.selected.has(String(photoId)),
     thumbUrl: (photo) => publicUrl(photo.thumb_path),
     onAfterRender: () => {
       GridInteractions.wireContainer(els.photoContainer, interactionCtx);
@@ -170,7 +178,7 @@
   const interactionCtx = {
     getCapabilities: () => caps,
     getSelectedCount: () => state.selected.size,
-    isSelected: (photoId) => state.selected.has(photoId),
+    isSelected: (photoId) => state.selected.has(String(photoId)),
     onToggleSelection: (_photoId, { event, card }) => {
       state.lastClickedIndex = GridSelection.toggleCard(
         els.photoContainer,
@@ -228,7 +236,10 @@
     if (!photo) {
       return;
     }
-    const card = els.photoContainer.querySelector(`.photo-card[data-id="${photoId}"]`);
+    const id = String(photoId);
+    const card = els.photoContainer.querySelector(
+      `.photo-card[data-id="${CSS.escape(id)}"]`,
+    );
     if (!card) {
       return;
     }
@@ -286,17 +297,18 @@
     if (!photo) {
       return;
     }
+    const id = String(photoId);
     const starred = isStarred(photo);
     if (starred) {
-      state.starred.delete(photoId);
+      state.starred.delete(id);
       if (photo.rating === 5) {
-        state.unstarredPublished.add(photoId);
+        state.unstarredPublished.add(id);
       }
     } else {
-      state.starred.add(photoId);
-      state.unstarredPublished.delete(photoId);
+      state.starred.add(id);
+      state.unstarredPublished.delete(id);
     }
-    patchStarOnGrid(photoId);
+    patchStarOnGrid(id);
     saveLocalState();
     if (els.clearStarsBtn) {
       els.clearStarsBtn.disabled = starredEffectiveSet().size === 0;
@@ -309,7 +321,7 @@
   function clearStars() {
     state.starred.clear();
     state.unstarredPublished = new Set(
-      state.photos.filter((photo) => photo.rating === 5).map((photo) => photo.id),
+      state.photos.filter((photo) => photo.rating === 5).map((photo) => String(photo.id)),
     );
     if (state.filters.starred) {
       rebuildPhotoGrid();
@@ -416,14 +428,12 @@
 
   function resolveDownloadTargets() {
     if (state.selected.size > 0) {
-      return state.photos.filter((photo) => state.selected.has(photo.id));
+      return state.photos.filter((photo) => state.selected.has(String(photo.id)));
     }
     return filteredPhotos();
   }
 
   function wireEvents() {
-    GridInteractions.wireContainer(els.photoContainer, interactionCtx);
-
     els.sortToggleBtn.addEventListener('click', () => {
       state.sortOrder = state.sortOrder === 'newest' ? 'oldest' : 'newest';
       rebuildPhotoGrid();

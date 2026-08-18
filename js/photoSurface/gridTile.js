@@ -134,6 +134,7 @@ const GridTile = (() => {
       thumbAlt,
     });
     applyStarBadgeState(card, favorited, caps);
+    ensureSelectCircle(card);
     return card;
   }
 

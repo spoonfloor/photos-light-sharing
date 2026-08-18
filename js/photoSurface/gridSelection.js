@@ -12,11 +12,7 @@ const GridSelection = (() => {
       return GridInteractions.parsePhotoId(card);
     }
     const raw = card?.dataset?.id;
-    if (raw == null || raw === '') {
-      return null;
-    }
-    const asNumber = Number(raw);
-    return Number.isFinite(asNumber) && String(asNumber) === raw ? asNumber : raw;
+    return raw == null || raw === '' ? null : raw;
   }
 
   function getAllCards(root) {

@@ -2,13 +2,15 @@
  * Shared grid click routing (selection, star, lightbox).
  */
 const GridInteractions = (() => {
+  /** @type {WeakMap<HTMLElement, { handler: (event: MouseEvent) => void, ctx: object }>} */
+  const wired = new WeakMap();
+
   function parsePhotoId(card) {
     const raw = card?.dataset?.id;
     if (raw == null || raw === '') {
       return null;
     }
-    const asNumber = Number(raw);
-    return Number.isFinite(asNumber) && String(asNumber) === raw ? asNumber : raw;
+    return raw;
   }
 
   function handleCardClick(ctx, card, event) {
@@ -52,12 +54,8 @@ const GridInteractions = (() => {
     ctx.onOpenLightbox?.(photoId);
   }
 
-  function wireContainer(container, ctx) {
-    if (!container || container.dataset.gridInteractionsWired === 'true') {
-      return;
-    }
-
-    container.addEventListener('click', (event) => {
+  function createClickHandler(container, ctx) {
+    return (event) => {
       const monthCircle = event.target.closest('.month-select-circle');
       if (monthCircle && container.contains(monthCircle)) {
         event.stopPropagation();
@@ -88,9 +86,22 @@ const GridInteractions = (() => {
       if (card && container.contains(card)) {
         handleCardClick(ctx, card, event);
       }
-    });
+    };
+  }
 
-    container.dataset.gridInteractionsWired = 'true';
+  function wireContainer(container, ctx) {
+    if (!container) {
+      return;
+    }
+
+    const existing = wired.get(container);
+    if (existing) {
+      container.removeEventListener('click', existing.handler);
+    }
+
+    const handler = createClickHandler(container, ctx);
+    container.addEventListener('click', handler);
+    wired.set(container, { handler, ctx });
   }
 
   return {

@@ -28,6 +28,9 @@ const SimplePhotoGrid = (() => {
     const caps = ctx.getCapabilities?.() ?? ViewCapabilities.get();
 
     if (!photos.length) {
+      if (ctx.interactionCtx && typeof GridInteractions !== 'undefined') {
+        GridInteractions.wireContainer(container, ctx.interactionCtx);
+      }
       ctx.onAfterRender?.(photos);
       return;
     }
@@ -78,6 +81,10 @@ const SimplePhotoGrid = (() => {
 
     if (typeof GridSelection !== 'undefined' && ctx.getSelectedIds) {
       GridSelection.applyToDom(container, ctx.getSelectedIds());
+    }
+
+    if (ctx.interactionCtx && typeof GridInteractions !== 'undefined') {
+      GridInteractions.wireContainer(container, ctx.interactionCtx);
     }
 
     ctx.onAfterRender?.(photos);

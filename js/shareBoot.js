@@ -170,19 +170,6 @@
     return photos;
   }
 
-  const gridCtx = {
-    getCapabilities: () => caps,
-    getSelectedIds: () => state.selected,
-    parseDate,
-    isStarred: (photo) => isStarred(photo),
-    isSelected: (photoId) => state.selected.has(String(photoId)),
-    thumbUrl: (photo) => mediaUrl(photo, 'thumb'),
-    onAfterRender: () => {
-      GridInteractions.wireContainer(els.photoContainer, interactionCtx);
-      updateChrome();
-    },
-  };
-
   const interactionCtx = {
     getCapabilities: () => caps,
     getSelectedCount: () => state.selected.size,
@@ -211,11 +198,24 @@
     onOpenLightbox: (photoId) => openLightbox(photoId),
   };
 
+  const gridCtx = {
+    getCapabilities: () => caps,
+    getSelectedIds: () => state.selected,
+    parseDate,
+    isStarred: (photo) => isStarred(photo),
+    isSelected: (photoId) => state.selected.has(String(photoId)),
+    thumbUrl: (photo) => mediaUrl(photo, 'thumb'),
+    interactionCtx,
+    onAfterRender: () => {
+      updateChrome();
+    },
+  };
+
   function rebuildPhotoGrid() {
     state.lastClickedIndex = null;
     const photos = filteredPhotos();
     els.shareEmpty.hidden = photos.length > 0;
-    SimplePhotoGrid.render(els.photoContainer, photos, gridCtx);
+    PhotoGrid.render(els.photoContainer, photos, gridCtx);
   }
 
   function syncSelectionView() {
@@ -530,6 +530,7 @@
     }
 
     loadLocalState();
+    PhotoChrome.applySurfaceChrome(caps);
     wireLightbox();
     wireEvents();
 

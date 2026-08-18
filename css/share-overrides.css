@@ -9,7 +9,7 @@ body.share-view {
   /* PL0: opaque equivalent of n% grid gray over page bg */
   --share-pre-meta-bg: color-mix(
     in srgb,
-    var(--placeholder-bg) 40%,
+    var(--placeholder-bg) 30%,
     var(--body-bg)
   );
 }

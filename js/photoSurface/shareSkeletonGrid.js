@@ -58,6 +58,9 @@ const ShareSkeletonGrid = (() => {
     const section = MonthGrid.createMonthSection(monthKey, {
       extraSectionClasses: ['share-skeleton-section'],
     });
+    if (placeholderLabels) {
+      section.sectionEl.classList.add('share-pl0');
+    }
     const monthLabel = section.sectionEl.querySelector('.month-label');
     if (monthLabel) {
       monthLabel.textContent = MonthGrid.monthLabel(monthKey);

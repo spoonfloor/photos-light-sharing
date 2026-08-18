@@ -45,7 +45,7 @@ const PhotoSurface = (() => {
       },
     };
 
-    function renderGrid() {
+    function renderGrid(options = {}) {
       const photos = getPhotos();
       if (emptyEl) {
         emptyEl.hidden = photos.length > 0;
@@ -53,11 +53,22 @@ const PhotoSurface = (() => {
       if (typeof PhotoGrid === 'undefined') {
         throw new Error('PhotoGrid is not loaded');
       }
-      PhotoGrid.render(container, photos, gridCtx);
+      PhotoGrid.render(container, photos, {
+        ...gridCtx,
+        deferThumbSrc: Boolean(options.deferThumbSrc),
+      });
+    }
+
+    function hydrateThumbs() {
+      if (typeof PhotoGrid === 'undefined') {
+        return;
+      }
+      PhotoGrid.hydrateThumbs(container, getPhotos(), gridCtx);
     }
 
     return {
       renderGrid,
+      hydrateThumbs,
       gridCtx,
       interactionCtx,
       getContainer: () => container,

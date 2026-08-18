@@ -210,9 +210,14 @@
     onAfterRender: updateChrome,
   });
 
-  function rebuildPhotoGrid() {
+  function rebuildPhotoGrid({ deferThumbSrc = false } = {}) {
     state.lastClickedIndex = null;
-    surface.renderGrid();
+    surface.renderGrid({ deferThumbSrc });
+    if (deferThumbSrc) {
+      void SurfaceLoadOverlay.flushDomPaint().then(() => {
+        surface.hydrateThumbs();
+      });
+    }
   }
 
   function syncSelectionView() {
@@ -526,6 +531,11 @@
     wireLightbox();
     wireEvents();
 
+    SurfaceLoadOverlay.show({
+      title: 'Loading share',
+      message: 'Loading your media.',
+    });
+
     try {
       const payload = await resolveShare(state.token);
       state.album = payload.album;
@@ -534,8 +544,12 @@
       const title = state.album.title || 'Shared Photos';
       document.title = title;
       els.sharePageTitle.textContent = title;
-      rebuildPhotoGrid();
+      surface.renderGrid({ deferThumbSrc: true });
+      await SurfaceLoadOverlay.flushDomPaint();
+      SurfaceLoadOverlay.hide();
+      surface.hydrateThumbs();
     } catch (error) {
+      SurfaceLoadOverlay.hide();
       els.shareError.hidden = false;
       els.shareError.textContent = error.message || 'Could not load share.';
     }

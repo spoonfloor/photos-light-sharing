@@ -39,18 +39,24 @@ const SimplePhotoGrid = (() => {
         container.appendChild(section.sectionEl);
       }
 
+      const thumbSrc = ctx.deferThumbSrc
+        ? null
+        : (ctx.thumbUrl?.(photo) ?? null);
       const card = GridTile.createCard({
         caps,
         photoId: photo.id,
         favorited: ctx.isStarred?.(photo) ?? false,
         isVideo: photo.file_type === 'video',
         selected: ctx.isSelected?.(photo.id) ?? false,
-        thumbSrc: ctx.thumbUrl?.(photo) ?? null,
+        thumbSrc,
         thumbAlt: photo.original_filename || 'Photo',
         index,
       });
 
-      GridTile.attachThumbLoadHandler(card.querySelector('.photo-thumb'));
+      const thumb = card.querySelector('.photo-thumb');
+      if (thumbSrc) {
+        GridTile.attachThumbLoadHandler(thumb);
+      }
       gridEl.appendChild(card);
     });
 
@@ -65,9 +71,29 @@ const SimplePhotoGrid = (() => {
     ctx.onAfterRender?.(photos);
   }
 
+  function hydrateThumbs(container, photos, ctx) {
+    if (!container || typeof ctx.thumbUrl !== 'function') {
+      return;
+    }
+
+    const photoById = new Map(photos.map((photo) => [String(photo.id), photo]));
+    container.querySelectorAll('.photo-thumb').forEach((img) => {
+      if (img.getAttribute('src')) {
+        return;
+      }
+      const photo = photoById.get(String(img.dataset.photoId));
+      if (!photo) {
+        return;
+      }
+      GridTile.attachThumbLoadHandler(img);
+      img.src = ctx.thumbUrl(photo);
+    });
+  }
+
   return {
     monthKey,
     monthHeaderLabel,
     render,
+    hydrateThumbs,
   };
 })();

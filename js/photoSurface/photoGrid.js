@@ -30,8 +30,16 @@ const PhotoGrid = (() => {
     }
   }
 
+  function hydrateThumbs(container, photos, ctx) {
+    if (typeof SimplePhotoGrid === 'undefined') {
+      return;
+    }
+    SimplePhotoGrid.hydrateThumbs(container, photos, ctx);
+  }
+
   return {
     render,
+    hydrateThumbs,
     initVirtual,
     isVirtualActive,
     destroyVirtual,

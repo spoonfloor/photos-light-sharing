@@ -331,6 +331,21 @@
     </div>
   </div>
 </div>
+<!-- Share load overlay — same chrome as library transition -->
+<div class="import-overlay" id="shareLoadOverlay" style="display: none">
+  <div class="import-card">
+    <div class="import-header">
+      <span class="import-title" id="shareLoadTitle">Loading share</span>
+    </div>
+
+    <div class="import-progress-section">
+      <div class="import-status-text">
+        <span id="shareLoadStatusLabel">Loading your media.</span>
+        <span class="import-spinner" aria-hidden="true"></span>
+      </div>
+    </div>
+  </div>
+</div>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/viewCapabilities.js"></script>
@@ -342,6 +357,7 @@
     <script src="js/photoSurface/simpleGrid.js"></script>
     <script src="js/photoSurface/photoGrid.js"></script>
     <script src="js/photoSurface/init.js"></script>
+    <script src="js/photoSurface/surfaceLoadOverlay.js"></script>
     <script src="js/photoSurface/lightboxMedia.js"></script>
     <script src="js/photoSurface/lightboxShell.js"></script>
     <script src="js/shareBoot.js"></script>

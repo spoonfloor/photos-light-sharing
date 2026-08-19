@@ -7,6 +7,8 @@
 
   const config = window.SHARE_VIEWER_CONFIG;
   const caps = ViewCapabilities.SHARE;
+  const SHARE_NOT_FOUND_MESSAGE =
+    'This link is no longer valid and the requested photos are unavailable.';
 
   const state = {
     token: null,
@@ -95,7 +97,7 @@
     });
     if (!response.ok) {
       if (response.status === 404) {
-        throw new Error('Share not found.');
+        throw new Error(SHARE_NOT_FOUND_MESSAGE);
       }
       throw new Error(`Could not load share (${response.status})`);
     }
@@ -599,7 +601,7 @@
       surface.hydrateThumbs();
     } catch (error) {
       const message = error.message || 'Could not load share.';
-      const notFound = message === 'Share not found.';
+      const notFound = message === SHARE_NOT_FOUND_MESSAGE;
       showShareFailure(message, { notFound });
     }
   }

@@ -60,3 +60,7 @@ body.share-view.share-view--not-found .share-error {
 .share-page-title.surface-layout-placeholder {
   width: fit-content;
 }
+
+#surfaceLoadOverlay .import-progress-section {
+  padding-top: 16px;
+}

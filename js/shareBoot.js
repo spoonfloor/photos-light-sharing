@@ -605,8 +605,8 @@
         : performance.now();
     SurfaceLoadOverlay.begin({
       overlayId: 'surfaceLoadOverlay',
-      title: 'Loading photos',
-      message: 'Loading shared media.',
+      titleElId: null,
+      message: 'Loading shared photos and videos.',
       showCancel: true,
       adoptScrim: true,
       scrimStartedAt,

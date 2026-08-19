@@ -62,7 +62,7 @@ const SurfaceLoadOverlay = (() => {
     showCancel,
     onCancel,
   }) {
-    const titleEl = document.getElementById(titleElId);
+    const titleEl = titleElId ? document.getElementById(titleElId) : null;
     const statusEl = document.getElementById(statusElId);
     const pathEl = pathElId ? document.getElementById(pathElId) : null;
     const actionsEl = actionsElId ? document.getElementById(actionsElId) : null;

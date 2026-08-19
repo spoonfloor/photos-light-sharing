@@ -46,6 +46,7 @@ const ViewCapabilities = (() => {
     dateJumper: false,
     recentImportsFilter: false,
     selectedFilterChip: true,
+    dayClusters: true,
     virtual: false,
     surface: 'share',
   });

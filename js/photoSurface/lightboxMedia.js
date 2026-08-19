@@ -213,29 +213,15 @@ const LightboxMedia = (() => {
       return;
     }
 
-    const img = new Image();
-    img.src = mediaUrl;
-
-    if (img.complete && img.naturalWidth > 0) {
-      const frame = createFrame();
-      if (typeof onVisualState === 'function') {
-        onVisualState(photo, img);
-      }
-      img.className = 'lightbox-media-element';
-      applyMediaStyles(frame, img, photo, previewRotation(), getDimensions);
-      img.alt = getAltText(photo);
-      frame.appendChild(img);
-      content.appendChild(frame);
-      return;
-    }
-
     const frame = createFrame();
     const placeholder = createPlaceholder();
     applyMediaStyles(frame, placeholder, photo, rotationDegrees, getDimensions);
     frame.appendChild(placeholder);
     content.appendChild(frame);
 
-    img.onload = () => {
+    const img = new Image();
+
+    const revealImage = () => {
       if (placeholder.parentNode) {
         placeholder.parentNode.removeChild(placeholder);
       }
@@ -246,14 +232,23 @@ const LightboxMedia = (() => {
       img.className = 'lightbox-media-element';
       applyMediaStyles(frame, img, photo, previewRotation(), getDimensions);
       img.alt = getAltText(photo);
-      frame.appendChild(img);
+      if (!img.parentNode) {
+        frame.appendChild(img);
+      }
     };
 
+    img.onload = revealImage;
     img.onerror = () => {
       if (typeof onImageError === 'function') {
         void onImageError(photo);
       }
     };
+
+    img.src = mediaUrl;
+
+    if (img.complete && img.naturalWidth > 0) {
+      revealImage();
+    }
   }
 
   return {

@@ -34,6 +34,7 @@ const ViewCapabilities = (() => {
     downloadInAppBar: true,
     downloadInUtilities: false,
     shareLink: false,
+    copyShareLink: true,
     libraryMenu: false,
     restore: false,
     import: false,

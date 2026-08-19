@@ -533,11 +533,40 @@
     });
   }
 
+  function showShareFailure(message, { notFound = false } = {}) {
+    document.body.classList.toggle('share-view--not-found', notFound);
+
+    const chromeMount = document.getElementById('appChromeMount');
+    if (chromeMount) {
+      chromeMount.hidden = notFound;
+    }
+
+    if (els.photoContainer) {
+      els.photoContainer.innerHTML = '';
+    }
+
+    if (els.sharePageTitle) {
+      els.sharePageTitle.hidden = notFound;
+      if (!notFound) {
+        els.sharePageTitle.textContent = 'Shared Photos';
+        els.sharePageTitle.classList.add('share-layout-placeholder');
+      }
+    }
+
+    if (els.shareEmpty) {
+      els.shareEmpty.hidden = true;
+    }
+
+    if (els.shareError) {
+      els.shareError.hidden = false;
+      els.shareError.textContent = message;
+    }
+  }
+
   async function boot() {
     state.token = parseShareToken();
     if (!state.token) {
-      els.shareError.hidden = false;
-      els.shareError.textContent = 'Missing share link.';
+      showShareFailure('Missing share link.', { notFound: true });
       return;
     }
 
@@ -569,8 +598,9 @@
       surface.renderGrid({ deferThumbSrc: true });
       surface.hydrateThumbs();
     } catch (error) {
-      els.shareError.hidden = false;
-      els.shareError.textContent = error.message || 'Could not load share.';
+      const message = error.message || 'Could not load share.';
+      const notFound = message === 'Share not found.';
+      showShareFailure(message, { notFound });
     }
   }
 

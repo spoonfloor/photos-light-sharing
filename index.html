@@ -9,17 +9,23 @@
     <link rel="stylesheet" href="css/styles.css?v=1" />
     <link rel="stylesheet" href="css/share-overrides.css?v=12" />
   </head>
-  <body class="share-view filter-chip-rail-visible">
+  <body class="share-view surface-load-active surface-load-phase-loading filter-chip-rail-visible">
     <div id="appChromeMount">
       <div id="appBarMount">
-<!-- App Bar Shell -->
+<!-- App Bar Shell — share viewer (app-only controls hidden at HTML layer). -->
 <div class="app-bar-wrapper no-select">
   <div class="app-bar-elements-layer">
     <div class="title-and-back">
       <span class="title title-photos" id="appBarTitle">Photos Light</span>
     </div>
 
-    <div class="date-picker" data-cap="dateJumper" style="visibility: hidden" aria-hidden="true">
+    <div
+      class="date-picker"
+      data-cap="dateJumper"
+      hidden
+      style="visibility: hidden"
+      aria-hidden="true"
+    >
       <span class="date-picker-label">Month</span>
       <select id="monthPicker" class="date-picker-select">
         <option value="1">January</option>
@@ -62,7 +68,6 @@
         aria-label="Download"
         title="Download"
         data-cap="downloadInAppBar"
-        hidden
       >
         <span class="material-symbols-outlined app-bar-icon">download</span>
       </button>
@@ -74,6 +79,7 @@
         aria-label="Add Photo"
         title="Add photo"
         data-cap="import"
+        hidden
       >
         <span class="material-symbols-outlined app-bar-icon">add_a_photo</span>
       </button>
@@ -95,6 +101,7 @@
         aria-label="Edit Date"
         title="Change date"
         data-cap="editDate"
+        hidden
       >
         <span class="material-symbols-outlined app-bar-icon">edit_calendar</span>
       </button>
@@ -118,6 +125,7 @@
         aria-label="Delete"
         title="Delete selected"
         data-cap="deleteKind"
+        hidden
       >
         <span class="material-symbols-outlined app-bar-icon">delete</span>
       </button>
@@ -137,15 +145,6 @@
       </div>
 <div class="filter-chip-rail" id="filterChipRail">
   <div class="filter-chip-rail-scroll">
-    <button
-      type="button"
-      class="filter-chip"
-      data-filter="recentImports"
-      aria-pressed="false"
-      data-cap="recentImportsFilter"
-    >
-      recent imports
-    </button>
     <button
       type="button"
       class="filter-chip"
@@ -341,6 +340,43 @@
     </div>
   </div>
 </div>
+<!-- Surface load overlay — scrim visible at t=0 (share hard reload SS2). -->
+<div
+  class="import-overlay import-overlay--scrim-only"
+  id="surfaceLoadOverlay"
+  style="display: flex"
+  aria-hidden="false"
+  data-surface-load-scrim-at=""
+>
+  <div class="import-card">
+    <div class="import-header">
+      <span class="import-title" id="surfaceLoadTitle">Loading photos</span>
+    </div>
+
+    <div class="import-progress-section">
+      <div class="import-status-text">
+        <span id="surfaceLoadStatusLabel">Loading shared media.</span>
+        <span class="import-spinner" aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <div class="import-actions" id="surfaceLoadActions" style="display: none">
+      <button class="btn btn-secondary" id="surfaceLoadCancelBtn" type="button">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+  (function () {
+    var overlay = document.getElementById('surfaceLoadOverlay');
+    var startedAt = performance.now();
+    window.__surfaceLoadScrimAt = startedAt;
+    if (overlay) {
+      overlay.dataset.surfaceLoadScrimAt = String(startedAt);
+    }
+  })();
+</script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/viewCapabilities.js"></script>
@@ -350,11 +386,14 @@
     <script src="js/photoSurface/chrome.js"></script>
     <script src="js/photoSurface/monthGrid.js"></script>
     <script src="js/photoSurface/simpleGrid.js"></script>
+    <script src="js/photoSurface/surfaceSkeletonGrid.js"></script>
     <script src="js/photoSurface/shareSkeletonGrid.js"></script>
     <script src="js/photoSurface/photoGrid.js"></script>
     <script src="js/photoSurface/init.js"></script>
     <script src="js/photoSurface/lightboxMedia.js"></script>
     <script src="js/photoSurface/lightboxShell.js"></script>
+    <script src="js/photoSurface/surfaceLoadOverlay.js"></script>
+    <script src="js/photoSurface/surfaceLoadChrome.js"></script>
     <script src="js/shareBoot.js?v=3"></script>
   </body>
 </html>

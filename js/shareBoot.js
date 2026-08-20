@@ -14,7 +14,7 @@
     token: null,
     album: null,
     photos: [],
-    sortOrder: 'newest',
+    sortOrder: 'oldest',
     filters: { starred: false, video: false, selected: false },
     selected: new Set(),
     starred: new Set(),
@@ -59,7 +59,7 @@
           String,
         ),
       );
-      state.sortOrder = localStorage.getItem(storageKey('sort')) || 'newest';
+      state.sortOrder = localStorage.getItem(storageKey('sort')) || 'oldest';
     } catch {
       state.starred = new Set();
       state.selected = new Set();

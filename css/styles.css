@@ -466,6 +466,23 @@ body.trash-view-active #lightboxDownloadBtn {
   color: var(--filter-chip-text-active-hover);
 }
 
+.filter-chip.inactive,
+.filter-chip:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  cursor: default;
+}
+
+.filter-chip.inactive:hover,
+.filter-chip.inactive[aria-pressed='true'],
+.filter-chip.inactive[aria-pressed='true']:hover,
+.filter-chip:disabled:hover,
+.filter-chip:disabled[aria-pressed='true'],
+.filter-chip:disabled[aria-pressed='true']:hover {
+  background: var(--filter-chip-bg);
+  color: var(--filter-chip-text);
+}
+
 .grid-root.grid-catalog-empty .grid-content-layer,
 .grid-root.grid-filter-zero .grid-content-layer,
 .grid-root.grid-library-empty .grid-content-layer,

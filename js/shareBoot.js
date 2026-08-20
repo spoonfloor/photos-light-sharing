@@ -21,6 +21,7 @@
     unstarredPublished: new Set(),
     lightboxPhotoId: null,
     lastClickedIndex: null,
+    filterCatalogReady: false,
   };
 
   const TOAST_DURATION_MS = 3000;
@@ -225,6 +226,20 @@
     return ids;
   }
 
+  function getFilterChipAvailability() {
+    if (!state.filterCatalogReady) {
+      return { starred: null, video: null };
+    }
+    const starredCount = starredEffectiveSet().size;
+    const videoCount = state.photos.filter(
+      (photo) => photo.file_type === 'video',
+    ).length;
+    return {
+      starred: starredCount > 0,
+      video: videoCount > 0,
+    };
+  }
+
   function comparePhotos(a, b) {
     const aDate = parseDate(a.date_taken)?.getTime() ?? 0;
     const bDate = parseDate(b.date_taken)?.getTime() ?? 0;
@@ -356,13 +371,29 @@
       state.sortOrder === 'newest' ? 'hourglass_arrow_down' : 'hourglass_arrow_up';
     els.sortToggleBtn.title = state.sortOrder === 'newest' ? 'Newest first' : 'Oldest first';
 
+    const filterAvailability = getFilterChipAvailability();
+    if (filterAvailability.starred === false) {
+      state.filters.starred = false;
+    }
+    if (filterAvailability.video === false) {
+      state.filters.video = false;
+    }
+
     PhotoChrome.updateFilterChips({
       scroll: els.filterChipScroll,
       activeFilters: state.filters,
       selectedCount,
       showSelectedChip: caps.selectedFilterChip,
+      filterAvailability,
       onToggle: (filterKey) => {
         if (filterKey === 'selected' && state.selected.size === 0) {
+          return;
+        }
+        const availability = getFilterChipAvailability();
+        if (filterKey === 'starred' && availability.starred !== true) {
+          return;
+        }
+        if (filterKey === 'video' && availability.video !== true) {
           return;
         }
         state.filters[filterKey] = !state.filters[filterKey];
@@ -572,6 +603,7 @@
     if (els.clearStarsBtn) {
       els.clearStarsBtn.disabled = starredEffectiveSet().size === 0;
     }
+    updateChrome();
     if (state.lightboxPhotoId != null && String(state.lightboxPhotoId) === id) {
       updateLightboxStarButton();
     }
@@ -582,7 +614,9 @@
     state.unstarredPublished = new Set(
       state.photos.filter((photo) => photo.rating === 5).map((photo) => String(photo.id)),
     );
-    if (state.filters.starred) {
+    const hadStarredFilter = state.filters.starred;
+    state.filters.starred = false;
+    if (hadStarredFilter || state.filters.selected) {
       rebuildPhotoGrid();
       return;
     }
@@ -757,6 +791,7 @@
     if (typeof SurfaceLoadChrome !== 'undefined') {
       SurfaceLoadChrome.adoptLoading({ overlayId: 'surfaceLoadOverlay' });
     }
+    updateChrome();
     await SurfaceLoadOverlay.flushDomPaint();
 
     const loadAbort = new AbortController();
@@ -793,11 +828,13 @@
       if (typeof SurfaceLoadChrome !== 'undefined') {
         SurfaceLoadChrome.enterMeta();
       }
+      updateChrome();
       document.title = els.sharePageTitle.textContent || 'Shared Photos';
 
       const payload = await fullPromise;
       state.album = payload.album;
       state.photos = payload.photos || [];
+      state.filterCatalogReady = true;
       applyShareTitle(state.album?.title);
       ShareDatePicker.applyFromPhotos(
         state.photos,

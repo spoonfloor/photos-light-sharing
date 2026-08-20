@@ -372,12 +372,10 @@
     els.sortToggleBtn.title = state.sortOrder === 'newest' ? 'Newest first' : 'Oldest first';
 
     const filterAvailability = getFilterChipAvailability();
-    if (filterAvailability.starred === false) {
-      state.filters.starred = false;
-    }
-    if (filterAvailability.video === false) {
-      state.filters.video = false;
-    }
+    const filtersCleared = FilterChipLifecycle.applyAutoClear(
+      state.filters,
+      filterAvailability,
+    );
 
     PhotoChrome.updateFilterChips({
       scroll: els.filterChipScroll,
@@ -386,14 +384,12 @@
       showSelectedChip: caps.selectedFilterChip,
       filterAvailability,
       onToggle: (filterKey) => {
-        if (filterKey === 'selected' && state.selected.size === 0) {
-          return;
-        }
-        const availability = getFilterChipAvailability();
-        if (filterKey === 'starred' && availability.starred !== true) {
-          return;
-        }
-        if (filterKey === 'video' && availability.video !== true) {
+        if (
+          !FilterChipLifecycle.canToggleFilter(filterKey, {
+            availability: getFilterChipAvailability(),
+            selectedCount: state.selected.size,
+          })
+        ) {
           return;
         }
         state.filters[filterKey] = !state.filters[filterKey];
@@ -401,6 +397,11 @@
         rebuildPhotoGrid();
       },
     });
+
+    if (filtersCleared) {
+      rebuildPhotoGrid();
+      return;
+    }
 
     const starredCount = starredEffectiveSet().size;
     if (els.clearStarsBtn) {
@@ -637,18 +638,24 @@
       return;
     }
     try {
-      if (photos.length >= (config.zipThreshold || 6)) {
-        const zip = new JSZip();
-        for (const photo of photos) {
-          const response = await fetch(mediaUrl(photo, 'original'));
-          if (!response.ok) {
-            throw new Error(`Download failed (${response.status})`);
-          }
-          const blob = await response.blob();
-          zip.file(photo.original_filename || `${photo.id}.bin`, blob);
-        }
-        const archive = await zip.generateAsync({ type: 'blob' });
-        triggerDownload(archive, `${state.album.title || state.token}.zip`);
+      if (DownloadExport.shouldZip(photos.length, config.zipThreshold)) {
+        await DownloadExport.downloadAsZip({
+          items: photos,
+          archiveName: `${state.album.title || state.token}.zip`,
+          fetchBlob: async (photo, signal) => {
+            const response = await fetch(mediaUrl(photo, 'original'), { signal });
+            if (!response.ok) {
+              throw new Error(`Download failed (${response.status})`);
+            }
+            return response.blob();
+          },
+          getEntryName: (photo) => photo.original_filename || `${photo.id}.bin`,
+          isVideo: LightboxMedia.isVideoPhoto,
+          deliverArchive: (archive, name) => {
+            DownloadExport.triggerBrowserDownload(archive, name);
+            DownloadExport.hidePrepModal();
+          },
+        });
         return;
       }
       for (const photo of photos) {
@@ -657,20 +664,18 @@
           throw new Error(`Download failed (${response.status})`);
         }
         const blob = await response.blob();
-        triggerDownload(blob, photo.original_filename || `${photo.id}.bin`);
+        DownloadExport.triggerBrowserDownload(
+          blob,
+          photo.original_filename || `${photo.id}.bin`,
+        );
       }
-    } catch {
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        return;
+      }
+      DownloadExport.hidePrepModal();
       showToast('Download failed');
     }
-  }
-
-  function triggerDownload(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
   }
 
   function resolveDownloadTargets() {

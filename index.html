@@ -319,6 +319,32 @@
     <span class="material-symbols-outlined">close</span>
   </button>
 </div>
+<!-- Download prep progress (zip exports only) -->
+<div class="import-overlay" id="downloadPrepOverlay" style="display: none">
+  <div class="import-card">
+    <div class="import-header">
+      <span class="import-title" id="downloadPrepTitle">Preparing download</span>
+    </div>
+
+    <div class="import-progress-section">
+      <div class="import-status-text" id="downloadPrepStatusText">
+        Zipping<span class="import-spinner" aria-hidden="true"></span>
+      </div>
+      <p class="download-prep-note" id="downloadPrepNote">
+        Your download will continue even if you close this window.
+      </p>
+    </div>
+
+    <div class="import-actions">
+      <button type="button" class="btn btn-secondary" id="downloadPrepCloseBtn">
+        Close
+      </button>
+      <button type="button" class="btn btn-secondary" id="downloadPrepCancelBtn">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="js/config.js"></script>
     <script src="js/viewCapabilities.js"></script>
@@ -326,6 +352,7 @@
     <script src="js/photoSurface/gridSelection.js"></script>
     <script src="js/photoSurface/gridInteractions.js"></script>
     <script src="js/photoSurface/chrome.js"></script>
+    <script src="js/photoSurface/filterChipLifecycle.js"></script>
     <script src="js/photoSurface/monthGrid.js"></script>
     <script src="js/photoSurface/simpleGrid.js"></script>
     <script src="js/photoSurface/surfaceSkeletonGrid.js"></script>
@@ -338,6 +365,7 @@
     <script src="js/photoSurface/surfaceLoadChrome.js"></script>
     <script src="js/photoSurface/datePickerChrome.js"></script>
     <script src="js/photoSurface/shareDatePicker.js"></script>
+    <script src="js/photoSurface/downloadExport.js"></script>
     <script src="js/shareBoot.js?v=8"></script>
   </body>
 </html>

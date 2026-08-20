@@ -2087,6 +2087,13 @@ body.surface-load-active .app-bar-icon-button {
   margin-bottom: 0;
 }
 
+.download-prep-note {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 /* Add margin only when stats are visible */
 .import-stats:not([style*='display: none']) {
   margin-top: 16px;

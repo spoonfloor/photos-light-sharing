@@ -128,7 +128,6 @@ const SurfaceLoadChrome = (() => {
     phase = 'meta';
     applyBodyPhaseClasses('meta');
     syncChipRailLayout(true);
-    hideDatePicker(false);
   }
 
   /** SS4 — load complete; caller runs enableAppBarButtons() next. */

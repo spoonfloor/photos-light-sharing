@@ -60,11 +60,3 @@ body.share-view.share-view--not-found .share-error {
 .share-page-title.surface-layout-placeholder {
   width: fit-content;
 }
-
-/* Single-year shares: show year in the normal box, no chevron, not interactive. */
-body.share-view .date-picker-select.date-picker-select--static {
-  pointer-events: none;
-  cursor: default;
-  padding-right: 10px;
-  background-image: none;
-}

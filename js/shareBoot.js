@@ -736,6 +736,8 @@
       SurfaceLoadChrome.complete();
     }
     SurfaceLoadOverlay.end({ overlayId: 'surfaceLoadOverlay' });
+    DatePickerChrome.onSurfaceLoadComplete();
+    ShareDatePicker.refreshCatalog(filteredPhotos(), parseDate);
   }
 
   async function boot() {
@@ -788,7 +790,6 @@
         meta,
         els.shareEmpty,
       );
-      ShareDatePicker.applyFromMeta(meta.first_cluster, state.sortOrder);
       if (typeof SurfaceLoadChrome !== 'undefined') {
         SurfaceLoadChrome.enterMeta();
       }

@@ -380,6 +380,13 @@ body.trash-view-active #lightboxDownloadBtn {
   color: #666;
 }
 
+.date-picker-select.date-picker-select--static {
+  pointer-events: none;
+  cursor: default;
+  padding-right: 10px;
+  background-image: none;
+}
+
 .app-bar-wrapper .title {
   font-size: var(--app-bar-title-size);
   font-weight: 300;
@@ -691,13 +698,12 @@ body.surface-load-phase-loading .date-picker {
   visibility: hidden !important;
 }
 
-body.surface-load-phase-meta .date-picker {
-  visibility: visible !important;
+body.surface-load-phase-meta .date-picker.date-jumper-active {
   opacity: 0.35;
   pointer-events: none;
 }
 
-body.surface-load-phase-meta .date-picker-select {
+body.surface-load-phase-meta .date-picker.date-jumper-active .date-picker-select {
   pointer-events: none;
 }
 

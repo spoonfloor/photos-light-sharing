@@ -130,11 +130,22 @@
   }
 
   function mediaUrl(photo, kind) {
-    const url = kind === 'thumb' ? photo.thumb_url : photo.original_url;
-    if (!url) {
-      throw new Error('Share media URL is missing.');
+    if (kind === 'thumb') {
+      if (!photo.thumb_url) {
+        throw new Error('Share thumb URL is missing.');
+      }
+      return photo.thumb_url;
     }
-    return url;
+    if (kind === 'display') {
+      if (!photo.display_url) {
+        throw new Error('Share display URL is missing.');
+      }
+      return photo.display_url;
+    }
+    if (!photo.original_url) {
+      throw new Error('Share original URL is missing.');
+    }
+    return photo.original_url;
   }
 
   function parseDate(value) {
@@ -426,9 +437,14 @@
     }
   }
 
-  function renderLightboxMedia({ useOriginal = true } = {}) {
+  function renderLightboxMedia() {
     const photo = photoById(state.lightboxPhotoId);
     if (!photo) {
+      closeLightbox();
+      return;
+    }
+    if (!photo.display_url && !LightboxMedia.isVideoPhoto(photo)) {
+      showToast('Preview unavailable for this photo');
       closeLightbox();
       return;
     }
@@ -436,19 +452,13 @@
     els.lightboxContent.style.backgroundColor = 'transparent';
     LightboxMedia.loadIntoContent(els.lightboxContent, photo, {
       isVideo: LightboxMedia.isVideoPhoto(photo),
-      getMediaUrl: () => {
-        if (useOriginal && photo.original_url) {
-          return photo.original_url;
-        }
-        return mediaUrl(photo, 'thumb');
-      },
+      getMediaUrl: () =>
+        LightboxMedia.isVideoPhoto(photo)
+          ? mediaUrl(photo, 'original')
+          : mediaUrl(photo, 'display'),
       getAltText: (p) => p.original_filename || 'Shared photo',
       nativeVideoControls: true,
       onImageError: () => {
-        if (useOriginal && photo.thumb_url) {
-          renderLightboxMedia({ useOriginal: false });
-          return;
-        }
         showToast('Preview unavailable for this photo');
       },
       onVideoError: () => {

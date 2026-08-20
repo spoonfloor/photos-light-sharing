@@ -265,6 +265,7 @@ body.trash-view-active.filter-chip-rail-visible {
 #lightboxRotateBtn[hidden],
 #lightboxStarBtn[hidden],
 #lightboxDownloadBtn[hidden],
+#lightboxDeleteBtn[hidden],
 #lightboxRestoreBtn[hidden],
 #viewTrashBtn[hidden],
 #emptyTrashBtn[hidden],

@@ -3,7 +3,7 @@
  * Used by the desktop app and share viewer (static/ is source of truth).
  */
 const DownloadExport = (() => {
-  const ZIP_THRESHOLD = 6;
+  const ZIP_THRESHOLD = 2;
   const OVERLAY_ID = 'downloadPrepOverlay';
   const FRAGMENT_PATH = 'fragments/downloadPrepOverlay.html';
 

@@ -516,6 +516,38 @@
     }
   }
 
+  function buildShareLightboxLoadOptions(photo) {
+    return {
+      isVideo: LightboxMedia.isVideoPhoto(photo),
+      getMediaUrl: () => mediaUrl(photo, 'display'),
+      getAltText: (p) => p.original_filename || 'Shared photo',
+      nativeVideoControls: true,
+      onImageError: () => {
+        showToast('Preview unavailable for this photo');
+      },
+      onVideoError: () => {
+        showToast('Preview unavailable for this video');
+      },
+    };
+  }
+
+  function preloadAdjacentShareLightboxImages() {
+    const photos = filteredPhotos();
+    const index = photos.findIndex(
+      (photo) => String(photo.id) === String(state.lightboxPhotoId),
+    );
+    if (index < 0) {
+      return;
+    }
+    LightboxMediaCache.prefetchAdjacent(photos, index, (entry) => {
+      try {
+        return mediaUrl(entry, 'display');
+      } catch {
+        return null;
+      }
+    });
+  }
+
   function renderLightboxMedia() {
     const photo = photoById(state.lightboxPhotoId);
     if (!photo) {
@@ -530,26 +562,23 @@
       els.lightboxContent.innerHTML = '';
       return false;
     }
+    LightboxMedia.prepareContentSwap(els.lightboxContent);
     els.lightboxContent.innerHTML = '';
     els.lightboxContent.style.backgroundColor = 'transparent';
-    LightboxMedia.loadIntoContent(els.lightboxContent, photo, {
-      isVideo: LightboxMedia.isVideoPhoto(photo),
-      getMediaUrl: () => mediaUrl(photo, 'display'),
-      getAltText: (p) => p.original_filename || 'Shared photo',
-      nativeVideoControls: true,
-      onImageError: () => {
-        showToast('Preview unavailable for this photo');
-      },
-      onVideoError: () => {
-        showToast('Preview unavailable for this video');
-      },
-    });
+    LightboxMedia.loadIntoContent(
+      els.lightboxContent,
+      photo,
+      buildShareLightboxLoadOptions(photo),
+    );
+    preloadAdjacentShareLightboxImages();
     return true;
   }
 
   function closeLightbox() {
     state.lightboxPhotoId = null;
+    LightboxMedia.prepareContentSwap(els.lightboxContent);
     els.lightboxContent.innerHTML = '';
+    LightboxMediaCache.clear();
     LightboxShell.hide();
   }
 
@@ -702,6 +731,16 @@
       formatInfo: formatShareLightboxInfo,
       updateNavArrows: updateLightboxNavArrows,
       updateStarButton: updateLightboxStarButton,
+    });
+
+    LightboxMedia.wireResizeUpgrade({
+      isOpen: () => state.lightboxPhotoId != null,
+      getPhoto: () => photoById(state.lightboxPhotoId),
+      getContent: () => els.lightboxContent,
+      getLoadOptions: () => {
+        const photo = photoById(state.lightboxPhotoId);
+        return photo ? buildShareLightboxLoadOptions(photo) : null;
+      },
     });
   }
 

@@ -44,7 +44,7 @@ const ViewCapabilities = (() => {
     deleteAppBarLabel: null,
     deleteLightboxLabel: null,
     appBarTitle: true,
-    dateJumper: false,
+    dateJumper: true,
     recentImportsFilter: false,
     selectedFilterChip: true,
     dayClusters: true,

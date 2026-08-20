@@ -287,7 +287,11 @@
       onToggleStar: (photoId) => toggleStar(photoId),
       onOpenLightbox: (photoId) => openLightbox(photoId),
     },
-    onAfterRender: updateChrome,
+    onAfterRender: () => {
+      ShareDatePicker.refreshCatalog(filteredPhotos(), parseDate);
+      ShareDatePicker.afterGridRender();
+      updateChrome();
+    },
   });
 
   function rebuildPhotoGrid({ deferThumbSrc = false } = {}) {
@@ -665,6 +669,7 @@
   function wireEvents() {
     els.sortToggleBtn.addEventListener('click', () => {
       state.sortOrder = state.sortOrder === 'newest' ? 'oldest' : 'newest';
+      ShareDatePicker.setSortOrder(state.sortOrder);
       rebuildPhotoGrid();
     });
 
@@ -742,6 +747,7 @@
 
     loadLocalState();
     PhotoSurface.mountChrome(caps);
+    ShareDatePicker.wire({ sortOrderGetter: () => state.sortOrder });
     wireLightbox();
     wireEvents();
 
@@ -782,6 +788,7 @@
         meta,
         els.shareEmpty,
       );
+      ShareDatePicker.applyFromMeta(meta.first_cluster, state.sortOrder);
       if (typeof SurfaceLoadChrome !== 'undefined') {
         SurfaceLoadChrome.enterMeta();
       }
@@ -791,6 +798,12 @@
       state.album = payload.album;
       state.photos = payload.photos || [];
       applyShareTitle(state.album?.title);
+      ShareDatePicker.applyFromPhotos(
+        state.photos,
+        parseDate,
+        state.sortOrder,
+        meta.first_cluster?.month_key,
+      );
       surface.renderGrid({ deferThumbSrc: true });
       surface.hydrateThumbs();
       loadSucceeded = true;

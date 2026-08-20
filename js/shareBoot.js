@@ -129,6 +129,48 @@
     els.sharePageTitle.classList.remove('surface-layout-placeholder');
   }
 
+  const BROWSER_NATIVE_STILL_EXTENSIONS = new Set([
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+  ]);
+
+  function stillExtension(filename) {
+    if (!filename) {
+      return '';
+    }
+    const dot = filename.lastIndexOf('.');
+    if (dot < 0) {
+      return '';
+    }
+    return filename.slice(dot).toLowerCase();
+  }
+
+  /**
+   * Lightbox/video display tier — mirrors share-resolve display_url rules.
+   * Grid uses thumb_url; download uses original_url.
+   */
+  function shareDisplayUrl(photo) {
+    if (!photo) {
+      return null;
+    }
+    if (photo.display_url) {
+      return photo.display_url;
+    }
+    if (!photo.original_url) {
+      return null;
+    }
+    if (LightboxMedia.isVideoPhoto(photo)) {
+      return photo.original_url;
+    }
+    if (BROWSER_NATIVE_STILL_EXTENSIONS.has(stillExtension(photo.original_filename))) {
+      return photo.original_url;
+    }
+    return null;
+  }
+
   function mediaUrl(photo, kind) {
     if (kind === 'thumb') {
       if (!photo.thumb_url) {
@@ -137,10 +179,11 @@
       return photo.thumb_url;
     }
     if (kind === 'display') {
-      if (!photo.display_url) {
+      const url = shareDisplayUrl(photo);
+      if (!url) {
         throw new Error('Share display URL is missing.');
       }
-      return photo.display_url;
+      return url;
     }
     if (!photo.original_url) {
       throw new Error('Share original URL is missing.');
@@ -440,22 +483,22 @@
   function renderLightboxMedia() {
     const photo = photoById(state.lightboxPhotoId);
     if (!photo) {
-      closeLightbox();
-      return;
+      return false;
     }
-    if (!photo.display_url && !LightboxMedia.isVideoPhoto(photo)) {
-      showToast('Preview unavailable for this photo');
-      closeLightbox();
-      return;
+    if (!shareDisplayUrl(photo)) {
+      showToast(
+        LightboxMedia.isVideoPhoto(photo)
+          ? 'Preview unavailable for this video'
+          : 'Preview unavailable for this photo',
+      );
+      els.lightboxContent.innerHTML = '';
+      return false;
     }
     els.lightboxContent.innerHTML = '';
     els.lightboxContent.style.backgroundColor = 'transparent';
     LightboxMedia.loadIntoContent(els.lightboxContent, photo, {
       isVideo: LightboxMedia.isVideoPhoto(photo),
-      getMediaUrl: () =>
-        LightboxMedia.isVideoPhoto(photo)
-          ? mediaUrl(photo, 'original')
-          : mediaUrl(photo, 'display'),
+      getMediaUrl: () => mediaUrl(photo, 'display'),
       getAltText: (p) => p.original_filename || 'Shared photo',
       nativeVideoControls: true,
       onImageError: () => {
@@ -465,6 +508,7 @@
         showToast('Preview unavailable for this video');
       },
     });
+    return true;
   }
 
   function closeLightbox() {
@@ -475,7 +519,10 @@
 
   function openLightbox(photoId) {
     state.lightboxPhotoId = photoId;
-    renderLightboxMedia();
+    if (!renderLightboxMedia()) {
+      state.lightboxPhotoId = null;
+      return;
+    }
     LightboxShell.show();
     LightboxShell.refreshChrome();
   }
@@ -493,7 +540,10 @@
       return;
     }
     state.lightboxPhotoId = next.id;
-    renderLightboxMedia();
+    if (!renderLightboxMedia()) {
+      closeLightbox();
+      return;
+    }
     LightboxShell.refreshChrome();
   }
 
@@ -548,21 +598,31 @@
     if (!photos.length) {
       return;
     }
-    if (photos.length >= (config.zipThreshold || 6)) {
-      const zip = new JSZip();
+    try {
+      if (photos.length >= (config.zipThreshold || 6)) {
+        const zip = new JSZip();
+        for (const photo of photos) {
+          const response = await fetch(mediaUrl(photo, 'original'));
+          if (!response.ok) {
+            throw new Error(`Download failed (${response.status})`);
+          }
+          const blob = await response.blob();
+          zip.file(photo.original_filename || `${photo.id}.bin`, blob);
+        }
+        const archive = await zip.generateAsync({ type: 'blob' });
+        triggerDownload(archive, `${state.album.title || state.token}.zip`);
+        return;
+      }
       for (const photo of photos) {
         const response = await fetch(mediaUrl(photo, 'original'));
+        if (!response.ok) {
+          throw new Error(`Download failed (${response.status})`);
+        }
         const blob = await response.blob();
-        zip.file(photo.original_filename || `${photo.id}.bin`, blob);
+        triggerDownload(blob, photo.original_filename || `${photo.id}.bin`);
       }
-      const archive = await zip.generateAsync({ type: 'blob' });
-      triggerDownload(archive, `${state.album.title || state.token}.zip`);
-      return;
-    }
-    for (const photo of photos) {
-      const response = await fetch(mediaUrl(photo, 'original'));
-      const blob = await response.blob();
-      triggerDownload(blob, photo.original_filename || `${photo.id}.bin`);
+    } catch {
+      showToast('Download failed');
     }
   }
 

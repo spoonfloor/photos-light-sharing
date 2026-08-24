@@ -45,6 +45,11 @@
   --utilities-menu-viewport-inset-end: 0px; /* outer: + nudges whole panel left (away from viewport right) */
   --app-bar-title-size: 20px;
   --app-bar-gap: 4px;
+  --app-bar-icon-btn-size: 44px;
+  --app-bar-icon-glyph-size: 24px;
+  --dialog-title-size: 20px;
+  --dialog-message-size: 15px;
+  --btn-font-size: 14px;
 
   /* --- Import-style overlay scoreboards (preflight + in-flight) --- */
   --scoreboard-col-min-width: 64px;
@@ -133,7 +138,7 @@ body {
 .btn {
   padding: 8px 16px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--btn-font-size);
   font-weight: 500;
   cursor: pointer;
   border: none;
@@ -249,33 +254,17 @@ body.trash-view-active.filter-chip-rail-visible {
   font-weight: 300;
 }
 
-.trash-chrome-bar[hidden] {
+/* Structural fix, not an allowlist: `[hidden]`'s UA-default display:none
+   has near-zero specificity, so any component rule that sets its own
+   `display` (e.g. .app-bar-icon-button { display: flex }) silently wins
+   and the hidden attribute stops doing anything. This previously had to
+   be re-asserted per element in a manually-maintained id list — which is
+   exactly how #deleteBtn fell through and stayed visible while hidden.
+   One universal rule makes that failure mode structurally impossible. */
+[hidden] {
   display: none !important;
 }
 
-#restoreBtn[hidden],
-#addPhotoBtn[hidden],
-#editDateBtn[hidden],
-#downloadSelectedBtn[hidden],
-#switchLibraryBtn[hidden],
-#convertToLibraryBtn[hidden],
-#closeLibraryBtn[hidden],
-#cleanOrganizeBtn[hidden],
-#lightboxEditDateBtn[hidden],
-#lightboxRotateBtn[hidden],
-#lightboxStarBtn[hidden],
-#lightboxDownloadBtn[hidden],
-#lightboxDeleteBtn[hidden],
-#lightboxRestoreBtn[hidden],
-#viewTrashBtn[hidden],
-#emptyTrashBtn[hidden],
-#restoreAllTrashBtn[hidden],
-#trashMenuDivider[hidden] {
-  display: none !important;
-}
-
-body.trash-view-active #addPhotoBtn,
-body.trash-view-active #editDateBtn,
 body.trash-view-active #lightboxEditDateBtn,
 body.trash-view-active #lightboxRotateBtn,
 body.trash-view-active #lightboxStarBtn,
@@ -334,8 +323,12 @@ body.trash-view-active #lightboxDownloadBtn {
   width: 100%;
   height: 100%;
   background: transparent;
+  /* Base gap: JS may squeeze --app-bar-actions-gap below this at runtime
+     (down to a floor of -iconW) when the bar is too narrow for all icons
+     at full gap — see squeezeActionsGap() in appBarLayout.js. */
   --app-bar-gap: 12px;
-  --app-bar-actions-gap: 12px;
+  --app-bar-actions-gap: 8px;
+  --app-bar-title-gap: 12px;
   --app-bar-title-max-w: calc(100% - 12rem);
   --app-bar-jumper-left: 0px;
 }
@@ -371,7 +364,8 @@ body.trash-view-active #lightboxDownloadBtn {
   z-index: 0;
 }
 
-.app-bar-elements-layer.app-bar-layout--jumper-no-fit .date-picker.date-jumper-active {
+.app-bar-elements-layer.app-bar-layout--jumper-no-fit
+  .date-picker.date-jumper-active {
   visibility: hidden;
   pointer-events: none;
 }
@@ -572,8 +566,8 @@ body.trash-view-active #lightboxDownloadBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: var(--app-bar-icon-btn-size);
+  height: var(--app-bar-icon-btn-size);
   cursor: pointer;
   background: none;
   border: none;
@@ -582,8 +576,8 @@ body.trash-view-active #lightboxDownloadBtn {
 }
 
 .app-bar-icon-button img.app-bar-icon {
-  width: 24px;
-  height: 24px;
+  width: var(--app-bar-icon-glyph-size);
+  height: var(--app-bar-icon-glyph-size);
   user-select: none;
   pointer-events: none;
 }
@@ -599,7 +593,7 @@ body.trash-view-active #lightboxDownloadBtn {
 }
 
 .app-bar-icon-button .material-symbols-outlined {
-  font-size: 24px;
+  font-size: var(--app-bar-icon-glyph-size);
   color: var(--text-primary);
   user-select: none;
   pointer-events: none;
@@ -642,7 +636,9 @@ body.trash-view-active #lightboxDownloadBtn {
   overflow: hidden;
 }
 
-.grid-root.grid-unknown-layout .grid-content-layer .virtual-month-section:not(.grid-anchor-month-section) {
+.grid-root.grid-unknown-layout
+  .grid-content-layer
+  .virtual-month-section:not(.grid-anchor-month-section) {
   visibility: hidden;
 }
 
@@ -734,7 +730,8 @@ body.trash-view-active #lightboxDownloadBtn {
   background: var(--placeholder-bg);
 }
 
-.date-picker.surface-date-picker-loading .date-picker-select.surface-layout-placeholder {
+.date-picker.surface-date-picker-loading
+  .date-picker-select.surface-layout-placeholder {
   pointer-events: none;
   border-color: transparent;
 }
@@ -761,7 +758,9 @@ body.surface-load-phase-meta .date-picker.date-jumper-active {
   pointer-events: none;
 }
 
-body.surface-load-phase-meta .date-picker.date-jumper-active .date-picker-select {
+body.surface-load-phase-meta
+  .date-picker.date-jumper-active
+  .date-picker-select {
   pointer-events: none;
 }
 
@@ -1427,7 +1426,7 @@ body.surface-load-active .app-bar-icon-button {
 }
 
 .dialog-title {
-  font-size: 20px;
+  font-size: var(--dialog-title-size);
   font-weight: 500;
   margin: 0;
   color: var(--text-primary);
@@ -1455,7 +1454,7 @@ body.surface-load-active .app-bar-icon-button {
 }
 
 .dialog-message {
-  font-size: 15px;
+  font-size: var(--dialog-message-size);
   margin-bottom: 24px;
   padding: 0 24px;
   color: var(--text-secondary);
@@ -2273,18 +2272,6 @@ body.open-library-modal-handoff .page-main {
 
 body.library-recovery-active .library-recovery-dock {
   display: block;
-}
-
-@media (max-width: 640px) {
-  .library-recovery-dock {
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
-  }
-
-  .library-recovery-card {
-    width: 100%;
-  }
 }
 
 #cleanLibraryOverlay .import-stats {
@@ -3457,4 +3444,33 @@ body.library-recovery-active .library-recovery-dock {
 
 .share-manage-icon-btn .material-symbols-outlined {
   font-size: 20px;
+}
+
+/* --- Small-screen overrides ---
+   Single breakpoint for narrow/mobile-width layout tuning. Kept as one
+   block, last in the file, so every override here reliably wins any
+   cascade tie against a same-specificity base rule declared earlier —
+   regardless of which selector that base rule used. Do not add another
+   @media (max-width: 480px) block elsewhere for these selectors; a
+   second one earlier in the file can silently lose this fight again. */
+@media (max-width: 480px) {
+  :root {
+    --app-bar-title-size: 24px;
+    --app-bar-icon-btn-size: 44px; /* = current value, dial in */
+    --app-bar-icon-glyph-size: 30px; /* = current value, dial in */
+    --filter-chip-height: 32px; /* = current value, dial in */
+    --filter-chip-padding-x: 16px; /* = current value, dial in */
+    --filter-chip-font-size: 15px; /* = current value, dial in */
+    --dialog-title-size: 20px; /* = current value, dial in */
+    --dialog-message-size: 15px; /* = current value, dial in */
+    --btn-font-size: 14px; /* = current value, dial in */
+  }
+
+  /* Icon gap vars are scoped to .app-bar-elements-layer (also read at
+     runtime by AppBarLayout.js), not :root — override here to match. */
+  .app-bar-elements-layer {
+    --app-bar-gap: 12px; /* = current value, dial in */
+    --app-bar-actions-gap: 8px; /* = current value, dial in */
+    --app-bar-title-gap: 0px; /* = current value, dial in — min. distance from title to icons before truncation */
+  }
 }

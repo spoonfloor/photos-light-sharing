@@ -5,7 +5,7 @@
  */
 
 body.share-view {
-  --page-top-gap: 24px;
+  --page-top-gap: 18px;
 }
 
 body.share-view.filter-chip-rail-visible {
@@ -72,3 +72,7 @@ body.share-view.share-view--not-found .share-error-retry {
 .share-page-title.surface-layout-placeholder {
   width: fit-content;
 }
+
+/* #downloadBtn's ≤480px move into the more menu is scoped to app at its
+   source (styles.css) — download always stays in share's app bar
+   (docs/share-ui-deltas.md), so no restore patch is needed here. */

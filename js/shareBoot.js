@@ -520,7 +520,7 @@
     });
   }
 
-  function renderLightboxMedia({ enterFrom = 0 } = {}) {
+  function renderLightboxMedia() {
     const photo = photoById(state.lightboxPhotoId);
     if (!photo) {
       return false;
@@ -537,10 +537,11 @@
     LightboxMedia.prepareContentSwap(els.lightboxContent);
     els.lightboxContent.innerHTML = '';
     els.lightboxContent.style.backgroundColor = 'transparent';
-    LightboxMedia.loadIntoContent(els.lightboxContent, photo, {
-      ...buildShareLightboxLoadOptions(photo),
-      enterFrom,
-    });
+    LightboxMedia.loadIntoContent(
+      els.lightboxContent,
+      photo,
+      buildShareLightboxLoadOptions(photo),
+    );
     preloadAdjacentShareLightboxImages();
     return true;
   }
@@ -576,7 +577,7 @@
       return;
     }
     state.lightboxPhotoId = next.id;
-    if (!renderLightboxMedia({ enterFrom: Math.sign(delta) })) {
+    if (!renderLightboxMedia()) {
       closeLightbox();
       return;
     }

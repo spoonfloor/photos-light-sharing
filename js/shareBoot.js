@@ -493,7 +493,13 @@
       isVideo: LightboxMedia.isVideoPhoto(photo),
       getMediaUrl: () => mediaUrl(photo, 'display'),
       getAltText: (p) => p.original_filename || 'Shared photo',
-      nativeVideoControls: true,
+      // Same custom transport as the app — no native <video controls> (iOS
+      // Safari's is unstyleable). See .claude/rules/app-share-inheritance.md.
+      mountVideoControls: (stage, video) => {
+        if (typeof LightboxVideoControls !== 'undefined') {
+          LightboxVideoControls.mount(stage, video);
+        }
+      },
       onImageError: () => {
         showToast('Preview unavailable for this photo');
       },
@@ -534,6 +540,9 @@
       els.lightboxContent.innerHTML = '';
       return false;
     }
+    if (typeof LightboxVideoControls !== 'undefined') {
+      LightboxVideoControls.unmount();
+    }
     LightboxMedia.prepareContentSwap(els.lightboxContent);
     els.lightboxContent.innerHTML = '';
     els.lightboxContent.style.backgroundColor = 'transparent';
@@ -547,6 +556,9 @@
 
   function closeLightbox() {
     state.lightboxPhotoId = null;
+    if (typeof LightboxVideoControls !== 'undefined') {
+      LightboxVideoControls.unmount();
+    }
     LightboxMedia.prepareContentSwap(els.lightboxContent);
     els.lightboxContent.innerHTML = '';
     LightboxMediaCache.clear();

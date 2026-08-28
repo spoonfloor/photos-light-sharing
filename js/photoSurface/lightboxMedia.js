@@ -222,7 +222,6 @@ const LightboxMedia = (() => {
       onImageError = null,
       onVideoError = null,
       mountVideoControls = null,
-      nativeVideoControls = false,
     } = options;
 
     const previewRotation = () =>
@@ -241,7 +240,6 @@ const LightboxMedia = (() => {
       onImageError,
       onVideoError,
       mountVideoControls,
-      nativeVideoControls,
     };
   }
 
@@ -549,9 +547,6 @@ const LightboxMedia = (() => {
       video.autoplay = true;
       video.playsInline = true;
       video.preload = 'auto';
-      if (resolved.nativeVideoControls) {
-        video.controls = true;
-      }
 
       applyMediaStyles(
         frame,

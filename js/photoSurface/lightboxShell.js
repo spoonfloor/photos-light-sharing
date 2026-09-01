@@ -158,6 +158,7 @@ const LightboxShell = (() => {
   function navigate(delta, { fromSwipe = false } = {}) {
     lastNavDelta = delta;
     lastNavWasSwipe = fromSwipe;
+    cancelPendingTapToggle(); // a queued single-tap chrome toggle is now moot
     ctx?.navigate?.(delta);
   }
 
@@ -276,6 +277,27 @@ const LightboxShell = (() => {
     }
   }
 
+  // Whether the lightbox can page in `direction` (-1 previous / +1 next)
+  // right now. Reads the same `.inactive` state setNavArrows drives from the
+  // host's updateNavArrows — the single source the chevrons already trust.
+  // lightboxGestures (docs/lightbox-pinch-zoom-plan.md) calls this to tell a
+  // boundary edge-overscroll apart from a normal swipe it should leave alone.
+  function canNavigate(direction) {
+    const btn = direction < 0 ? els.prevBtn : els.nextBtn;
+    return Boolean(btn) && !btn.classList.contains('inactive');
+  }
+
+  // The gesture recognizer (pinch / pan / edge overscroll) owns the touch
+  // while a gesture is settling or in flight — the shell's swipe / swipe-down
+  // / tap classifier must stand down for the rest of that touch. Constant
+  // false until Phase B binds a recognizer.
+  function gesturesEngaged() {
+    return (
+      typeof LightboxGestures !== 'undefined' &&
+      (LightboxGestures.isZoomed() || LightboxGestures.isGestureActive())
+    );
+  }
+
   // --- Fade-up-from-black on open (docs/lightbox-480-plan.md) ---
   // A one-shot opaque black scrim (.lightbox-open-scrim in styles.css, timing
   // in --lightbox-anim-scrim-*) over the whole overlay, faded out and removed.
@@ -287,29 +309,19 @@ const LightboxShell = (() => {
     if (!els.overlay) {
       return;
     }
-    if (
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
+    if (LightboxMedia.prefersReducedMotion()) {
       return;
     }
     const scrim = document.createElement('div');
     scrim.className = 'lightbox-open-scrim';
     els.overlay.appendChild(scrim);
-    // Prime the opaque state before arming the fade, else the two writes coalesce.
-    void scrim.offsetWidth;
-    scrim.classList.add('is-fading');
-    let done = false;
-    const remove = (e) => {
-      if (done || (e && e.propertyName !== 'opacity')) {
-        return;
-      }
-      done = true;
-      scrim.removeEventListener('transitionend', remove);
-      scrim.remove();
-    };
-    scrim.addEventListener('transitionend', remove);
-    setTimeout(remove, LightboxMedia.transitionTimeoutMs(scrim));
+    // Shared primitive: reflow-commit the opaque state, add .is-fading (which
+    // carries `transition: opacity`), remove the node once the fade settles.
+    LightboxMedia.animateTransform(scrim, {
+      arm: () => scrim.classList.add('is-fading'),
+      property: 'opacity',
+      settle: () => scrim.remove(),
+    });
   }
 
   function show() {
@@ -334,6 +346,11 @@ const LightboxShell = (() => {
       playOpenScrim();
     }
     showUI();
+    // Bind the narrow-gesture recognizer + refresh its CSS-var knobs while the
+    // lightbox is open (dropped again in hide()).
+    if (typeof LightboxGestures !== 'undefined') {
+      LightboxGestures.activate();
+    }
     // Same overflow/squeeze engine as the grid app bar, scoped to
     // #lightboxMount — see appBarLayout.js.
     LightboxAppBarLayout.init();
@@ -349,6 +366,10 @@ const LightboxShell = (() => {
     document.body.style.overflow = '';
     touchActive = false;
     mouseActive = false;
+    cancelPendingTapToggle();
+    if (typeof LightboxGestures !== 'undefined') {
+      LightboxGestures.deactivate(); // unbind recognizer + drop any zoom/pan
+    }
     clearChevronHideTimeout();
     LightboxAppBarLayout.disconnect();
   }
@@ -453,6 +474,10 @@ const LightboxShell = (() => {
   let mouseActive = false;
   let mouseStartX = 0;
   let mouseStartY = 0;
+  // Single-tap chrome toggle is deferred by LightboxGestures.dblTapWindowMs()
+  // so a second tap can resolve as a double-tap zoom instead (Phase D).
+  let pendingTapToggle = null;
+  let pendingTapAt = 0;
 
   function isInteractiveTarget(target) {
     return Boolean(
@@ -468,6 +493,11 @@ const LightboxShell = (() => {
   // above). A mouse drag past the tap threshold is simply a no-op, at any
   // distance, in any direction.
   function classifyGesture(deltaX, deltaY, { allowDrag }) {
+    // Stand down while a pinch / pan / overscroll owns the touch — that
+    // gesture already handled the movement (docs/lightbox-pinch-zoom-plan.md).
+    if (gesturesEngaged()) {
+      return;
+    }
     if (allowDrag) {
       if (Math.abs(deltaX) >= SWIPE_MIN_DISTANCE && Math.abs(deltaX) > Math.abs(deltaY)) {
         // Swipe left → next, right → previous (same convention as the
@@ -483,6 +513,7 @@ const LightboxShell = (() => {
         // button (commits pending rotations), not the Escape shortcut (which
         // discards them) — a deliberate exit gesture, not a discard-and-bail
         // escape hatch.
+        cancelPendingTapToggle();
         LightboxMedia.animateFrameExit(els.content, () => ctx?.onBack?.());
         return;
       }
@@ -492,13 +523,58 @@ const LightboxShell = (() => {
       // that started on a registered interactive element never reach here
       // (touchActive/mouseActive is already false — see the isInteractiveTarget
       // check in each start handler), so this only fires for genuinely
-      // unclaimed surface. App bar only: no timer, no effect on chevron
-      // visibility (that's the independent auto-hide timer).
-      toggleAppBar();
+      // unclaimed surface. App bar only: no effect on chevron visibility
+      // (that's the independent auto-hide timer).
+      scheduleAppBarToggle();
       return;
     }
     // Swipe-up, ambiguous sub-swipe-threshold moves, and (for mouse) any
     // drag past the tap threshold are intentional no-ops today.
+  }
+
+  function dblTapWindowMs() {
+    return (
+      (typeof LightboxGestures !== 'undefined' &&
+        LightboxGestures.dblTapWindowMs?.()) ||
+      0
+    );
+  }
+
+  // Cancel a chrome toggle still waiting out the double-tap window — called
+  // when the touch turns out to be something else (nav / exit / close).
+  function cancelPendingTapToggle() {
+    if (pendingTapToggle !== null) {
+      clearTimeout(pendingTapToggle);
+      pendingTapToggle = null;
+    }
+  }
+
+  // Defer the single-tap chrome toggle by the double-tap window. A second tap
+  // inside the window cancels it (LightboxGestures handles the zoom); if the
+  // gestures module isn't present (desktop / not loaded) fall straight
+  // through to the old immediate behaviour.
+  function scheduleAppBarToggle() {
+    const win = dblTapWindowMs();
+    if (!win) {
+      toggleAppBar();
+      return;
+    }
+    const now = Date.now();
+    if (pendingTapToggle !== null && now - pendingTapAt < win) {
+      cancelPendingTapToggle(); // second tap → double-tap, zoom owns it
+      pendingTapAt = 0;
+      return;
+    }
+    cancelPendingTapToggle();
+    pendingTapAt = now;
+    pendingTapToggle = setTimeout(() => {
+      pendingTapToggle = null;
+      // A double-tap that landed after this was scheduled consumed the tap.
+      if (LightboxGestures.lastDoubleTapAt() >= pendingTapAt) {
+        return;
+      }
+      toggleAppBar();
+    }, win);
   }
 
   function toggleAppBar() {
@@ -510,7 +586,14 @@ const LightboxShell = (() => {
   }
 
   function onOverlayTouchStart(e) {
-    if (!isOpen() || e.touches.length !== 1 || isInteractiveTarget(e.target)) {
+    if (
+      !isOpen() ||
+      e.touches.length !== 1 ||
+      isInteractiveTarget(e.target) ||
+      gesturesEngaged()
+    ) {
+      // A 1-finger start while zoomed routes to pan, and a 2-finger start to
+      // pinch — both inside lightboxGestures, never this recognizer.
       touchActive = false;
       return;
     }
@@ -668,6 +751,10 @@ const LightboxShell = (() => {
     refreshInfo,
     applyCapabilities,
     setNavArrows,
+    canNavigate,
+    // Shared with lightboxGestures (edge-overscroll capture threshold) so the
+    // 10px figure keeps one definition.
+    TAP_MAX_MOVEMENT,
     showUI,
     hideUI,
     handleKey,

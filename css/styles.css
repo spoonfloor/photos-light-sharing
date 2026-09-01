@@ -1485,6 +1485,31 @@ body.surface-load-active .app-bar-icon-button {
   overflow: hidden;
 }
 
+/* While a pinch / double-tap zoom is active the scaled gesture layer must be
+   free to grow past the fit-sized frame and fill the whole viewport — so lift
+   the frame's clip and let .lightbox-content (overflow: hidden, above) do the
+   clipping instead. lightboxGestures.js toggles this. At 1× the frame keeps
+   its own clip so an edge-overscroll still slides the photo off into black. */
+.lightbox-media-frame.gesture-zoomed {
+  overflow: visible;
+}
+
+/* Dedicated transform layer for lightbox gestures — pinch / pan / edge
+   overscroll (docs/lightbox-pinch-zoom-plan.md, lightboxGestures.js). Media
+   mounts into this element; it fills the frame's content box exactly, so the
+   absolutely-positioned media inside centers against it just as it did
+   against the frame (identical rendering at rest). Gestures translate/scale
+   THIS element only; the frame keeps its entry/exit transform, the media
+   keeps its centering/rotate transform. At 1× it sits inside the frame's
+   `overflow: hidden`, so an overscroll translate slides the photo off one
+   edge and reveals black with no extra styling; while zoomed the frame's clip
+   is lifted (.gesture-zoomed) so the scaled layer can fill the viewport. */
+.lightbox-gesture-layer {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
 .lightbox-media-frame .lightbox-media-element,
 .lightbox-media-frame .lightbox-media-placeholder {
   max-width: none;
@@ -3975,6 +4000,16 @@ body.library-recovery-active .library-recovery-dock {
     --overlay-dismiss-text: 17px;
     --overlay-dismiss-close: 28px;
     --lightbox-info-panel-pad-y: 24px;
+
+    /* Lightbox narrow gestures (docs/lightbox-pinch-zoom-plan.md,
+       lightboxGestures.js). Read once per lightbox open — unitless numbers,
+       not CSS lengths, because JS parseFloat's them. The 1:1 pinch ceiling is
+       computed per photo (natural px vs rendered px), never a token; the
+       snap-back tween reuses --lightbox-anim-entry-*. Owner-dialed in phase F. */
+    --lightbox-gesture-rubber-c: 0.55; /* iOS UIScrollView resistance (pinch clamp + overscroll + pan edges) */
+    --lightbox-overscroll-max-px: 68; /* hard cap on rubber-band travel (overscroll + pan-past-edge) */
+    --lightbox-zoom-dbltap-scale: 2.5; /* double-tap target, multiple of fit, clamped ≤ ceiling */
+    --lightbox-zoom-dbltap-window-ms: 300; /* double-tap window; also the shell's single-tap defer */
   }
 
   /* Thumbnail grid goes edge-to-edge at this breakpoint. #photoContainer

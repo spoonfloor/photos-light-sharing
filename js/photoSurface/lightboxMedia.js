@@ -11,13 +11,19 @@ const LightboxMedia = (() => {
   /** @type {HTMLElement | null} */
   let observedContent = null;
 
-  // --- Lightbox photo-surface animations (docs/lightbox-480-plan.md) ---
+  // --- Lightbox photo-surface animations (docs/lightbox-480-plan.md,
+  //     docs/lightbox-pinch-zoom-plan.md Phase A2) ---
   // All timings/distances live in CSS (--lightbox-anim-* + the
   // .is-animating-entry / .is-exiting / .lightbox-open-scrim classes in
   // styles.css). JS here only toggles classes, forces the priming reflow,
   // and derives its cleanup backstop from the element's resolved
   // transition-duration — so there is no timing constant to keep in sync.
+  // The frame entry/exit slides, the open scrim (lightboxShell), and every
+  // gesture-layer snap-back (lightboxGestures) all run through the one
+  // animateTransform primitive below.
 
+  // Shared reduced-motion check — the single definition (lightboxShell's open
+  // scrim and lightboxGestures' snap-backs call this one, not their own copy).
   function prefersReducedMotion() {
     return (
       typeof window.matchMedia === 'function' &&
@@ -44,6 +50,54 @@ const LightboxMedia = (() => {
     return longest * 1000 + TRANSITION_END_SLACK_MS;
   }
 
+  /**
+   * One-shot managed CSS transition. `prime` (optional) sets the start state;
+   * a reflow commits it statically. `arm` then sets the end state — adds a
+   * class or writes el.style.* — and the browser transitions to it. `settle`
+   * runs exactly once: on the real transitionend for `property`, FILTERED to
+   * `el` itself (transitionend BUBBLES — a descendant's transition, a
+   * gesture-layer snap-back or a video-stage fade, must not end this one), or
+   * on the transitionTimeoutMs backstop when the event never lands (tab
+   * backgrounded mid-animation, interrupted nav, zero-delta).
+   *
+   * Callers handle prefers-reduced-motion themselves (bail before calling);
+   * this assumes motion is allowed. Shared by animateFrameEntry /
+   * animateFrameExit (here), playOpenScrim (lightboxShell), and
+   * LightboxGestures.tweenTransform (pinch / pan / overscroll snap-backs).
+   */
+  function animateTransform(el, { prime, arm, property = 'transform', settle } = {}) {
+    const done = typeof settle === 'function' ? settle : () => {};
+    if (!el) {
+      done();
+      return;
+    }
+    if (typeof prime === 'function') {
+      prime();
+    }
+    // Commit the primed start position (or the element's current resting
+    // state) before arming, else the browser coalesces both writes and
+    // nothing animates.
+    void el.offsetWidth;
+    if (typeof arm === 'function') {
+      arm();
+    }
+    let finished = false;
+    let fallback = null;
+    const finish = (e) => {
+      if (finished || (e && (e.target !== el || e.propertyName !== property))) {
+        return;
+      }
+      finished = true;
+      if (fallback !== null) {
+        clearTimeout(fallback);
+      }
+      el.removeEventListener('transitionend', finish);
+      done();
+    };
+    el.addEventListener('transitionend', finish);
+    fallback = setTimeout(finish, transitionTimeoutMs(el));
+  }
+
   // Swipe-nav entry ("fake swipe"): the outgoing frame is a hard cut (already
   // gone — the caller cleared #lightboxContent before loadIntoContent). The
   // incoming frame mounts offset toward the side it came from and slides to
@@ -60,29 +114,24 @@ const LightboxMedia = (() => {
       return;
     }
     const fromClass = delta > 0 ? 'entering-from-right' : 'entering-from-left';
-    frame.classList.add('is-animating-entry', fromClass);
-    // Force the offset start position to paint before dropping it, else the
-    // browser coalesces both writes and nothing animates.
-    void frame.offsetWidth;
-    frame.classList.remove(fromClass);
-    // Drop the transition class once settled so a later frame.style.transform
-    // (there is none today) can't be silently animated. transitionend is the
-    // normal path; the timeout is the backstop.
-    let done = false;
-    let fallback = null;
-    const cleanup = (e) => {
-      if (done || (e && e.propertyName !== 'transform')) {
-        return;
-      }
-      done = true;
-      if (fallback !== null) {
-        clearTimeout(fallback);
-      }
-      frame.removeEventListener('transitionend', cleanup);
-      frame.classList.remove('is-animating-entry');
-    };
-    frame.addEventListener('transitionend', cleanup);
-    fallback = setTimeout(cleanup, transitionTimeoutMs(frame));
+    // Order matters. `prime` applies the offset with the transition NOT yet
+    // armed; animateTransform's reflow commits it as a static start position
+    // (nothing to animate none→offset). `arm` then adds .is-animating-entry
+    // (which carries `transition: transform`) and drops the offset in one
+    // mutation, so the only thing that animates is offset→center. Merging
+    // both class adds into one `add('is-animating-entry', fromClass)` (36834dc)
+    // left the transition armed across the offset's first paint, and the
+    // incoming photo hard-cut to center instead of sliding in.
+    animateTransform(frame, {
+      prime: () => frame.classList.add(fromClass),
+      arm: () => {
+        frame.classList.add('is-animating-entry');
+        frame.classList.remove(fromClass);
+      },
+      // Drop the transition class once settled so a later frame.style.transform
+      // (there is none today) can't be silently animated.
+      settle: () => frame.classList.remove('is-animating-entry'),
+    });
   }
 
   // Swipe-down exit (docs "Interim"): release-triggered, no drag tracking.
@@ -99,25 +148,15 @@ const LightboxMedia = (() => {
       return;
     }
     frame.dataset.exiting = '1';
-    let called = false;
-    const run = () => {
-      if (called) {
-        return;
-      }
-      called = true;
-      frame.removeEventListener('transitionend', onEnd);
-      finish();
-    };
-    // transitionend fires per-property (transform + opacity) — act on
-    // 'transform' only; `called` guards the double anyway.
-    const onEnd = (e) => {
-      if (e.propertyName === 'transform') {
-        run();
-      }
-    };
-    frame.classList.add('is-exiting');
-    frame.addEventListener('transitionend', onEnd);
-    setTimeout(run, transitionTimeoutMs(frame));
+    // Already-mounted, already-painted element — the reflow inside
+    // animateTransform is a harmless no-op start-state commit (no `prime`).
+    // .is-exiting transitions transform + opacity together; animateTransform
+    // settles on the frame's own 'transform' end (or the backstop), then the
+    // host's real close tears the overlay down.
+    animateTransform(frame, {
+      arm: () => frame.classList.add('is-exiting'),
+      settle: finish,
+    });
   }
 
   function normalizeRotationDegrees(degrees) {
@@ -199,7 +238,24 @@ const LightboxMedia = (() => {
     if (photoId != null) {
       frame.dataset.photoId = String(photoId);
     }
+    // Dedicated transform layer for lightbox gestures — pinch / pan / edge
+    // overscroll (docs/lightbox-pinch-zoom-plan.md, lightboxGestures.js). All
+    // media mounts INTO this layer; every gesture writes transform ONLY here,
+    // so applyMediaStyles (media transform) and the frame entry/exit
+    // animations (frame transform) never collide with it. Present at every
+    // width — identity at rest; LightboxGestures stays inert unless the
+    // pointer is coarse and ≤480, so the wide-width cost is one wrapper div.
+    const gestureLayer = document.createElement('div');
+    gestureLayer.className = 'lightbox-gesture-layer';
+    frame.appendChild(gestureLayer);
     return frame;
+  }
+
+  // Where media mounts and gesture transforms apply. Falls back to the frame
+  // itself for any frame predating the gesture layer (defensive — every
+  // createFrame path now builds one).
+  function mediaMount(frameEl) {
+    return frameEl.querySelector('.lightbox-gesture-layer') || frameEl;
   }
 
   function applyMediaStyles(
@@ -222,7 +278,9 @@ const LightboxMedia = (() => {
     frameEl.style.width = frameDims.width || '';
     frameEl.style.height = frameDims.height || '';
     frameEl.style.maxHeight = frameDims.maxHeight || '';
-    frameEl.style.overflow = 'hidden';
+    // overflow is CSS-only (.lightbox-media-frame { overflow: hidden }) so the
+    // .gesture-zoomed override (overflow: visible while a zoom is on screen)
+    // can win — an inline `hidden` here would clip the zoomed gesture layer.
 
     if (!mediaEl) {
       return;
@@ -249,6 +307,19 @@ const LightboxMedia = (() => {
       mediaEl.style.transform = 'translate(-50%, -50%)';
     }
     mediaEl.style.transformOrigin = 'center center';
+
+    // Gesture transforms live on .lightbox-gesture-layer, never on the frame
+    // or the media element. This tail also runs on resize relayout, so it
+    // only clears the layer when nothing legitimately owns it: not during a
+    // live pinch/pan/overscroll, and not while a settled zoom is held (nav /
+    // rotate clear that explicitly — loadIntoContent + reloadOpenLightboxMedia).
+    if (
+      typeof LightboxGestures !== 'undefined' &&
+      !LightboxGestures.isGestureActive() &&
+      !LightboxGestures.isZoomed()
+    ) {
+      LightboxGestures.reset();
+    }
   }
 
   function isVideoPhoto(photo) {
@@ -302,7 +373,7 @@ const LightboxMedia = (() => {
     );
     img.alt = resolved.getAltText(photo);
     if (!img.parentNode) {
-      frame.appendChild(img);
+      mediaMount(frame).appendChild(img);
     }
     if (typeof resolved.onVisualState === 'function') {
       resolved.onVisualState(photo, img);
@@ -331,7 +402,8 @@ const LightboxMedia = (() => {
           resolved.getDimensions,
         );
         upgradedImg.alt = resolved.getAltText(photo);
-        frame.replaceChild(upgradedImg, currentImg);
+        // parent may be the gesture layer, not the frame — swap in place.
+        currentImg.parentNode.replaceChild(upgradedImg, currentImg);
         if (typeof resolved.onVisualState === 'function') {
           resolved.onVisualState(photo, upgradedImg);
         }
@@ -362,7 +434,7 @@ const LightboxMedia = (() => {
         resolved.getDimensions,
       );
       nextImg.alt = resolved.getAltText(photo);
-      liveFrame.replaceChild(nextImg, liveImg);
+      liveImg.parentNode.replaceChild(nextImg, liveImg);
       if (typeof resolved.onVisualState === 'function') {
         resolved.onVisualState(photo, nextImg);
       }
@@ -405,7 +477,7 @@ const LightboxMedia = (() => {
       resolved.rotationDegrees,
       resolved.getDimensions,
     );
-    frame.appendChild(placeholder);
+    mediaMount(frame).appendChild(placeholder);
     content.appendChild(frame);
 
     const img = new Image();
@@ -442,7 +514,7 @@ const LightboxMedia = (() => {
       // next frame is real (rAF is the fallback for no-decode() browsers
       // and the rare decode() rejection on interrupted nav).
       if (!img.parentNode) {
-        frame.appendChild(img);
+        mediaMount(frame).appendChild(img);
       }
       if (typeof img.decode === 'function') {
         img.decode().then(dropPlaceholder, dropPlaceholder);
@@ -595,6 +667,14 @@ const LightboxMedia = (() => {
       return;
     }
 
+    // A fresh frame is mounting (nav / initial open / rotation reload) — drop
+    // any zoom/pan/overscroll from the outgoing photo. The applyMediaStyles
+    // tail can't do this: once settled zoom exists it deliberately leaves the
+    // layer alone (so a resize relayout doesn't nuke the zoom).
+    if (typeof LightboxGestures !== 'undefined') {
+      LightboxGestures.reset();
+    }
+
     const resolved = resolveLoadOptions(photo, options);
     if (typeof resolved.getMediaUrl !== 'function') {
       return;
@@ -635,7 +715,7 @@ const LightboxMedia = (() => {
 
       stage.appendChild(placeholder);
       stage.appendChild(video);
-      frame.appendChild(stage);
+      mediaMount(frame).appendChild(stage);
 
       if (typeof resolved.mountVideoControls === 'function') {
         resolved.mountVideoControls(stage, video);
@@ -703,5 +783,7 @@ const LightboxMedia = (() => {
     relayoutCurrent,
     animateFrameExit,
     transitionTimeoutMs,
+    animateTransform,
+    prefersReducedMotion,
   };
 })();

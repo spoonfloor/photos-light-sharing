@@ -719,6 +719,11 @@
       updateStarButton: updateLightboxStarButton,
     });
 
+    LightboxGestures.wire({
+      canNavigate: (direction) => LightboxShell.canNavigate(direction),
+      tapMaxMovement: LightboxShell.TAP_MAX_MOVEMENT,
+    });
+
     LightboxMedia.wireResizeUpgrade({
       isOpen: () => state.lightboxPhotoId != null,
       getPhoto: () => photoById(state.lightboxPhotoId),
